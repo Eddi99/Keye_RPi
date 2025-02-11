@@ -2,6 +2,14 @@
 
 set -e  # Exit immediately if a command exits with a non-zero status
 
+# Systempakete aktualisieren & fehlende Abhängigkeiten installieren
+echo "Aktualisiere Systempakete..."
+sudo apt update && sudo apt full-upgrade -y
+
+# Systempakete aktualisieren & fehlende Abhängigkeiten installieren
+echo "Installiere Hailo..."
+sudo apt install hailo-all
+
 # Source environment variables and activate virtual environment
 echo "Sourcing environment variables and activating virtual environment..."
 source setup_env.sh
