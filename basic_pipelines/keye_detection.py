@@ -3,7 +3,6 @@ import os  # Importiert das OS-Modul für Betriebssystem-Interaktionen
 import numpy as np  # Importiert NumPy für numerische Berechnungen
 import cv2  # Importiert OpenCV für Bildverarbeitung
 import hailo  # Importiert die Hailo-Bibliothek für KI-gestützte Objekterkennung
-
 from hailo_apps_infra.hailo_rpi_common import (
     get_caps_from_pad,  # Funktion zum Abrufen der Eigenschaften des Videostreams
     get_numpy_from_buffer,  # Konvertiert den Video-Buffer in ein NumPy-Array
@@ -99,6 +98,12 @@ def app_callback(pad, info, user_data):
     if object_in_zone:
         user_data.in_zone_frames += 1
         user_data.out_zone_frames = 0  # Setzt den Zähler für Frames ohne Objekt zurück
+        
+        # Wenn das Objekt 4 aufeinanderfolgende Frames lang in der Zone erkannt wird, schalte das Relais ab
+        if user_data.in_zone_frames >= 4 and not user_data.is_it_active:
+            user_data.is_it_active = True
+            print(f"{user_data.target_object.capitalize()} in Gefahrenzone, Sicherheitskreis wird abgeschaltet!")
+            
     else:
         user_data.out_zone_frames += 1
         user_data.in_zone_frames = 0  # Setzt den Zähler für Frames mit Objekt zurück
