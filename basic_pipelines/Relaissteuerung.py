@@ -1,88 +1,51 @@
-import hid
-from time import sleep
-import sys
-import termios
-import tty
+import hid  # Importiert die hid-Bibliothek für den Zugriff auf HID-Geräte
+from time import sleep  # Importiert die sleep-Funktion, um Verzögerungen zu ermöglichen
 
-USB_CFG_VENDOR_ID = 0x16c0  # Should suit, if not check ID with a tool like USBDeview
-USB_CFG_DEVICE_ID = 0x05DF  # Should suit, if not check ID with a tool like USBDeview
+class USBRelay:
+    def __init__(self, vendor_id=0x16c0, product_id=0x05DF): # Initialisiert das USB-Relais mit den angegebenen Vendor- und Product-IDs
+        self.vendor_id = vendor_id  # Hersteller-ID des Relais
+        self.product_id = product_id  # Produkt-ID des Relais
+        self.device = None  # Variable zur Speicherung des HID-Geräts
+        self.connect()  # Verbindung zum Relais beim Erstellen des Objekts herstellen
 
-device = None
-
-def get_Hid_USBRelay():
-    global device
-    try:
-        device = hid.Device(USB_CFG_VENDOR_ID, USB_CFG_DEVICE_ID)
-        print("Device connected successfully")
-    except Exception as e:
-        print(f"Failed to open device: {e}")
-        device = None
-
-def close_device():
-    global device
-    if device:
-        device.close()
-        device = None
-        print("Device closed")
-
-def write_row_data(buffer):
-    global device
-    if device:
+    def connect(self): # Stellt die Verbindung zum HID-Gerät her
         try:
-            device.write(bytes(buffer))
-            return True
+            self.device = hid.Device(self.vendor_id, self.product_id)  # Versucht, das Gerät zu öffnen
+            print("Device connected successfully")  # Gibt eine Erfolgsmeldung aus
         except Exception as e:
-            print(f"Failed to write data: {e}")
-            return False
-    else:
-        print("Device not connected")
-        return False
+            print(f"Failed to open device: {e}")  # Gibt eine Fehlermeldung aus, falls das Gerät nicht verbunden werden kann
+            self.device = None  # Setzt das Gerät auf None, falls die Verbindung fehlschlägt
 
-def on_all():
-    if write_row_data([0, 0xFE, 0, 0, 0, 0, 0, 0, 1]):
-        return True
-    else:
-        print("Cannot turn ON all relays")
-        return False
+    def close(self): # Schließt die Verbindung zum HID-Gerät
+        if self.device:  # Überprüft, ob ein Gerät geöffnet ist
+            self.device.close()  # Schließt die Verbindung zum Gerät
+            self.device = None  # Setzt die Gerätevariable auf None
+            print("Device closed")  # Gibt eine Bestätigung aus
 
-def off_all():
-    if write_row_data([0, 0xFC, 0, 0, 0, 0, 0, 0, 1]):
-        return True
-    else:
-        print("Cannot turn OFF all relays")
-        return False
+    def write_data(self, buffer): # Sendet Daten an das HID-Gerät
+        if self.device:  # Überprüft, ob das Gerät verbunden ist
+            try:
+                self.device.write(bytes(buffer))  # Schreibt die Daten als Byte-Array an das Gerät
+                return True  # Gibt True zurück, wenn der Schreibvorgang erfolgreich war
+            except Exception as e:
+                print(f"Failed to write data: {e}")  # Gibt eine Fehlermeldung aus, falls der Schreibvorgang fehlschlägt
+                return False  # Gibt False zurück, wenn der Schreibvorgang nicht erfolgreich war
+        else:
+            print("Device not connected")  # Gibt eine Meldung aus, wenn das Gerät nicht verbunden ist
+            return False  # Gibt False zurück, wenn kein Gerät verbunden ist
 
-def get_key():
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-    tty.setcbreak(fd)
-    try:
-        return sys.stdin.read(1)
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+    def turn_on_all(self): # Schaltet alle Relais ein
+        if self.write_data([0, 0xFE, 0, 0, 0, 0, 0, 0, 1]):  # Sendet den Befehl zum Einschalten aller Relais
+            print("All relays turned ON")  # Gibt eine Bestätigung aus
+            return True  # Gibt True zurück, wenn der Befehl erfolgreich gesendet wurde
+        else:
+            print("Cannot turn ON all relays")  # Gibt eine Fehlermeldung aus, wenn das Einschalten fehlschlägt
+            return False  # Gibt False zurück, wenn der Befehl nicht gesendet werden konnte
 
-get_Hid_USBRelay()
-
-print('e für einschalten, a für ausschalten, Leertaste, um zu beenden')
-while True:
-    try:
-        key = get_key()
-        if key == 'a':
-            print('Relais aus!')
-            print("TURN OFF ALL: {}".format(off_all()))
-            sleep(0.1)
-
-        elif key == 'e':
-            print('Relais ein!')
-            print("TURN ON ALL: {}".format(on_all()))
-            sleep(0.1)
-
-        elif key == ' ':
-            print('Beenden!')
-            print("TURN OFF ALL: {}".format(off_all()))
-            close_device()
-            break
-    except KeyboardInterrupt:
-        print("Beenden durch STRG+C")
-        close_device()
-        break
+    def turn_off_all(self): # Schaltet alle Relais aus
+        if self.write_data([0, 0xFC, 0, 0, 0, 0, 0, 0, 1]):  # Sendet den Befehl zum Ausschalten aller Relais
+            print("All relays turned OFF")  # Gibt eine Bestätigung aus
+            return True  # Gibt True zurück, wenn der Befehl erfolgreich gesendet wurde
+        else:
+            print("Cannot turn OFF all relays")  # Gibt eine Fehlermeldung aus, wenn das Ausschalten fehlschlägt
+            return False  # Gibt False zurück, wenn der Befehl nicht gesendet werden konnte
