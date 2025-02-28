@@ -20,7 +20,7 @@ Für eine detaillierte Anleitung zum Setup der hailo-pipelines Core-Electronics 
 	/Keye_RPi/. install.sh
 
 ### Test
-Um das erfolgreiche Installieren der Pipelines und requirements zu verifizieren, testlauf starten:
+Um das erfolgreiche Installieren der Pipelines und Requirements zu verifizieren, testlauf starten:
 	```bash
 	cd /Keye_RPi
 	. setup_env.sh
