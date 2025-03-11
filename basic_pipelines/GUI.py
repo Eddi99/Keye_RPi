@@ -1,8 +1,8 @@
 import cv2  # OpenCV für Bildverarbeitung
 import threading  # Für paralleles Ausführen der Objekterkennung
-from PyQt6.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget, QHBoxLayout  # PyQt6 für GUI-Elemente
-from PyQt6.QtGui import QPixmap, QImage, QPainter, QPen  # PyQt6 für Bildverarbeitung und Zeichnen
-from PyQt6.QtCore import Qt  # PyQt6 für Fenstersteuerung und Punktkoordinaten
+from PyQt5.QtWidgets import QLabel, QPushButton, QVBoxLayout, QWidget, QHBoxLayout  # PyQt6 für GUI-Elemente
+from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen  # PyQt6 für Bildverarbeitung und Zeichnen
+from PyQt5.QtCore import Qt  # PyQt6 für Fenstersteuerung und Punktkoordinaten
 
 
 class GUIApp(QWidget):
@@ -71,7 +71,7 @@ class GUIApp(QWidget):
 
     def capture_frame(self):
         """Nimmt Einzelbild zum Setzen der ROIs auf"""
-        cap = cv2.VideoCapture(1)  # Öffnet die Kamera mit Index 1
+        cap = cv2.VideoCapture(0)  # Öffnet die Kamera mit Index 1
         cap.set(3, 1280)  # Setzt die Breite des Kamera-Frames auf 1280 Pixel
         cap.set(4, 720)  # Setzt die Höhe des Kamera-Frames auf 720 Pixel
         ret, frame = cap.read()  # Nimmt ein Einzelbild auf
@@ -122,8 +122,8 @@ class GUIApp(QWidget):
     def mousePressEvent(self, event):
         """Erfasst die Mausposition, speichert die ROI-Punkte und zeigt ein temporäres Rechteck an."""
         if len(self.roi_points) < 4:
-            x = int(event.position().x() - self.label.geometry().x())
-            y = int(event.position().y() - self.label.geometry().y())  # Korrigiert die Mausposition relativ zum Bild
+            x = int(event.pos().x() - self.label.geometry().x())
+            y = int(event.pos().y() - self.label.geometry().y())  # Korrigiert die Mausposition relativ zum Bild
             x = max(0, min(x, self.label.width() - 1))
             y = max(0, min(y, self.label.height() - 1))
             self.roi_points.append((x, y))
@@ -152,11 +152,11 @@ class GUIApp(QWidget):
         self.relais_on_button.setVisible(True)  # Zeigt den Relais-EIN-Button an
         self.relais_off_button.setVisible(True)  # Zeigt den Relais-AUS-Button an
 
-        self.logic.set_rois(roi1, roi2)  # ROI werte an die decision_logic übergeben
+        #self.logic.set_rois(roi1, roi2)  # ROI werte an die decision_logic übergeben
 
-        self.logic.detector.set_frame_callback(self.update_frame) # Setzt das Frame-Update-Callback für das Live-Bild der Erkennung
-        detection_thread = threading.Thread(target=self.logic.start_detection)  # Startet die Personenerkennung als separaten Thread, damit andere Teile des Programms weiterlaufen können
-        detection_thread.start()
+        #self.logic.detector.set_frame_callback(self.update_frame) # Setzt das Frame-Update-Callback für das Live-Bild der Erkennung
+        #detection_thread = threading.Thread(target=self.logic.start_detection)  # Startet die Personenerkennung als separaten Thread, damit andere Teile des Programms weiterlaufen können
+        #detection_thread.start()
 
     def roi_reset(self):
         self.roi_points.clear()  # leert die Liste der gesetzten ROI-punkte

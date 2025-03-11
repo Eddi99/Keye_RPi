@@ -1,5 +1,5 @@
 import sys  # Für die Steuerung des Programms und Zugriff auf Systemargumente
-from PyQt6.QtWidgets import QApplication  # Importiert die Hauptklasse für die GUI-Anwendung
+from PyQt5.QtWidgets import QApplication  # Importiert die Hauptklasse für die GUI-Anwendung
 from decision_logic import DecisionLogic  # Importiert die Steuerlogik für Objekterkennung & Relaissteuerung
 from GUI import GUIApp  # Importiert die grafische Benutzeroberfläche
 
