@@ -1,38 +1,54 @@
-import threading
-import queue
-from relay_control.relaissteuerung import USBRelay
-from basic_pipelines.keye_detection import user_app_callback_class
+
+import threading  # Für parallele Threads
+from keye_detection import ObjectDetection  # Import der Objekterkennung
+from relaiscontrol import RelaisControl  # Import der Relaissteuerung
 
 class DecisionLogic:
     def __init__(self):
-        self.relay = USBRelay()  # Initialisiert das Relais-Steuermodul
-        self.detection = user_app_callback_class()  # Initialisiert die Objekterkennung
-        self.event_queue = queue.Queue()  # Warteschlange zur Synchronisation von Events
+        """Initialisiert die Steuerlogik, Objekterkennung und Relaissteuerung."""
+        self.detector = ObjectDetection()  # Erstellt ein Objekt für die Objekterkennung
+        self.relais = RelaisControl()  # Erstellt ein Objekt für die Relaissteuerung
+        self.detector.set_detection_callback(self.handle_detection)  # Setzt die Callback-Funktion für die Erkennung
+        self.roi1 = None  # Speichert die erste ROI (Region of Interest)
+        self.roi2 = None  # Speichert die zweite ROI (Region of Interest)
+        self.detection_thread = None  # Speichert den Thread für die Erkennung
 
-    def process_detection(self, detected_object, in_danger_zone):
-        """Verarbeitet die Detektion und steuert das Relais basierend auf der Position"""
-        if in_danger_zone and not self.relay.is_active:
-            print(f"[⚠️] {detected_object} in Gefahr! Relais wird abgeschaltet.")
-            self.relay.turn_off_all()
-        elif not in_danger_zone and self.relay.is_active:
-            print(f"[✅] {detected_object} hat die Gefahrenzone verlassen. Relais wird wieder eingeschaltet.")
-            self.relay.turn_on_all()
+    def set_rois(self, roi1, roi2):
+        """Speichert die definierten ROIs und übergibt sie an die Objekterkennung."""
+        self.roi1 = roi1  # Setzt die erste ROI
+        self.roi2 = roi2  # Setzt die zweite ROI
+        self.detector.set_rois(roi1, roi2)  # Übergibt die ROIs an die Objekterkennung
+        #print("Decision_logic.set_rois:", roi1, roi2)  # Gibt eine Bestätigung aus
 
-    def detection_listener(self):
-        """Läuft als Hintergrund-Thread und empfängt Daten von keye_detection"""
-        while True:
-            try:
-                detected_object, in_danger_zone = self.event_queue.get()
-                self.process_detection(detected_object, in_danger_zone)
-            except Exception as e:
-                print(f"[❌] Fehler in der Entscheidungslogik: {e}")
+    def start_detection(self):
+        """Startet die Objekterkennung in einem separaten Thread, wenn ROIs gesetzt sind."""
+        if self.roi1 and self.roi2:  # Überprüft, ob ROIs vorhanden sind
+            if not self.detection_thread or not self.detection_thread.is_alive():  # Verhindert mehrfaches Starten
+                self.detection_thread = threading.Thread(target=self.detector.run, daemon=True)  # Erstellt neuen Thread
+                self.detection_thread.start()  # Startet die Erkennung
+                self.relais.on_all() # startet bei Start der Detection initial das Relais ein
+                #print("start_detection: Erkennung gestartet...")
+        else:
+            print("ROIs müssen zuerst gesetzt werden!")  # Falls keine ROIs gesetzt wurden
 
-    def start(self):
-        """Startet die Entscheidungslogik und die Detektion in Threads"""
-        threading.Thread(target=self.detection_listener, daemon=True).start()
+    def stop_detection(self):
+        """Beendet die laufende Objekterkennung sicher."""
+        if self.detector.running:  # Prüft, ob die Erkennung läuft
+            self.detector.stop()  # Setzt die Steuerungsvariable auf False
+            if self.detection_thread:
+                self.detection_thread.join()  # Wartet auf das Beenden des Threads
 
-        # Hier würde das Keye-Detection-Skript in einer Schleife laufen
-        # Alternativ könnte keye_detection so angepasst werden, dass es Daten aktiv an die event_queue sendet
+    def handle_detection(self, detected):
+        """Callback-Funktion, die von der Objekterkennung aufgerufen wird."""
+        if detected:
+            #print("handle_detection: Relais aus")
+            self.relais.off_all()  # Schaltet das Relais aus, wenn eine Person erkannt wird
+        else:
+            #print("handle_detection: Relais ein")
+            self.relais.on_all()  # Schaltet das Relais ein, wenn keine Person erkannt wird
 
-decision_logic = DecisionLogic()
-decision_logic.start()
+    def shutdown(self):
+        """Beendet das gesamte System sicher."""
+        print("System wird heruntergefahren...")
+        self.stop_detection()  # Beendet die Erkennung
+        self.relais.close_device() # Beendet die Verbindung zum Relais
