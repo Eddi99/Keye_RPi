@@ -128,7 +128,7 @@ class GUIApp(QWidget):
             y = max(0, min(y, self.label.height() - 1))
             self.roi_points.append((x, y))
             self.temp_roi = (x, y, x, y)  # Setzt das temporäre Rechteck
-            # print(f"mousePressEvent: ROI {self.current_roi}: Punkt {len(self.roi_points) % 2 + 1} gesetzt: {x}, {y}")
+            print(f"mousePressEvent: ROI {self.current_roi}: Punkt {len(self.roi_points) % 2 + 1} gesetzt: {x}, {y}")
             self.show_frame()  # zeigt das Bild aktualisiert mit den aktuellen ROIs an, falls es welche gibt
             if len(self.roi_points) == 4 and self.confirm_button_bool:
                 self.confirm_button.setEnabled(True)  # aktiviert den confirm_button, falls die ROI gesetzt wurden
@@ -137,8 +137,7 @@ class GUIApp(QWidget):
 
     def confirm_rois(self):
         """Bestätigt die gesetzten ROIs und übergibt sie an die Entscheidungslogik."""
-        roi1 = (self.roi_points[0][0] / 1280, self.roi_points[0][1] / 720,
-                # ROI Koordinaten in absolute Werte zwischen 0 und 1 umrechnen und speichern
+        roi1 = (self.roi_points[0][0] / 1280, self.roi_points[0][1] / 720, # ROI Koordinaten in absolute Werte zwischen 0 und 1 umrechnen und speichern
                 self.roi_points[1][0] / 1280, self.roi_points[1][1] / 720)
         roi2 = (self.roi_points[2][0] / 1280, self.roi_points[2][1] / 720,
                 self.roi_points[3][0] / 1280, self.roi_points[3][1] / 720)
@@ -152,11 +151,11 @@ class GUIApp(QWidget):
         self.relais_on_button.setVisible(True)  # Zeigt den Relais-EIN-Button an
         self.relais_off_button.setVisible(True)  # Zeigt den Relais-AUS-Button an
 
-        #self.logic.set_rois(roi1, roi2)  # ROI werte an die decision_logic übergeben
+        self.logic.set_rois(roi1, roi2)  # ROI werte an die decision_logic übergeben
 
-        #self.logic.detector.set_frame_callback(self.update_frame) # Setzt das Frame-Update-Callback für das Live-Bild der Erkennung
-        #detection_thread = threading.Thread(target=self.logic.start_detection)  # Startet die Personenerkennung als separaten Thread, damit andere Teile des Programms weiterlaufen können
-        #detection_thread.start()
+        self.logic.detector.set_frame_callback(self.update_frame) # Setzt das Frame-Update-Callback für das Live-Bild der Erkennung
+        detection_thread = threading.Thread(target=self.logic.start_detection)  # Startet die Personenerkennung als separaten Thread, damit andere Teile des Programms weiterlaufen können
+        detection_thread.start()
 
     def roi_reset(self):
         self.roi_points.clear()  # leert die Liste der gesetzten ROI-punkte

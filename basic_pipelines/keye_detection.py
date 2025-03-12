@@ -1,126 +1,153 @@
-import gi  # Importiert GObject-Introspection für die Nutzung von GStreamer
-import os  # Importiert das OS-Modul für Betriebssystem-Interaktionen
-import numpy as np  # Importiert NumPy für numerische Berechnungen
-import cv2  # Importiert OpenCV für Bildverarbeitung
-import hailo  # Importiert die Hailo-Bibliothek für KI-gestützte Objekterkennung
-from hailo_apps_infra.hailo_rpi_common import (
-    get_caps_from_pad,  # Funktion zum Abrufen der Eigenschaften des Videostreams
-    get_numpy_from_buffer,  # Konvertiert den Video-Buffer in ein NumPy-Array
-    app_callback_class,  # Basis-Klasse für Callback-Funktionen
-)
-from hailo_apps_infra.detection_pipeline import GStreamerDetectionApp  # Importiert die Hailo GStreamer App-Klasse
-from gpiozero import LED  # Importiert GPIOZero zur Steuerung der LEDs
+import cv2  # OpenCV für Bildverarbeitung
+import threading
+from ultralytics import YOLO  # YOLO für Objekterkennung
 
-gi.require_version('Gst', '1.0')  # Stellt sicher, dass GStreamer mit Version 1.0 geladen wird
-from gi.repository import Gst, GLib  # Importiert GStreamer und GLib für Medienverarbeitung
 
-# Benutzerdefinierte Callback-Klasse für die Objekterkennung
-class user_app_callback_class(app_callback_class): 
-    def __init__(self):
-        super().__init__()  # Ruft den Konstruktor der Basisklasse auf
-        self.target_object = "person"  # Das zu erkennende Objekt (z. B. "person")
-        
-        # Definition der ersten Region of Interest (ROI)
-        self.zone1_x_min = 0.6  # Linke Grenze der ROI
-        self.zone1_x_max = 1.0  # Rechte Grenze der ROI
-        self.zone1_y_min = 0.0  # Obere Grenze der ROI
-        self.zone1_y_max = 1.0  # Untere Grenze der ROI
-        
-        # Definition der zweiten Region of Interest (ROI)
-        self.zone2_x_min = 0.0  # Linke Grenze der zweiten ROI
-        self.zone2_x_max = 0.4  # Rechte Grenze der zweiten ROI
-        self.zone2_y_min = 0.0  # Obere Grenze der zweiten ROI
-        self.zone2_y_max = 1.0  # Untere Grenze der zweiten ROI
-        
-        # Variablen zur Frame-Überwachung für stabilere Erkennung
-        self.in_zone_frames = 0  # Anzahl aufeinanderfolgender Frames mit Objekt in einer der Zonen
-        self.out_zone_frames = 0  # Anzahl aufeinanderfolgender Frames ohne Objekt in einer der Zonen
-        
-        # Statusvariable für die Aktivierung des Relais
-        self.is_it_active = False
+class ObjectDetection:
+    def __init__(self, model_path="yolo11n_ncnn_model"):
+        self.cap = cv2.VideoCapture(0)  # Öffnet die Kamera mit Index 0, falls kamera  nicht erkannt ggf. ändern
+        self.model_path = model_path # speichert den Pfad zum Yolo-Modell, dass an die Klasse übergeben wird
+        self.model = None # PLatzhalter für das Yolo-Modell
+        self.cap.set(3, 1280)  # Setzt die Breite des Kamera-Frames auf 1280 Pixel
+        self.cap.set(4, 720)  # Setzt die Höhe des Kamera-Frames auf 720 Pixel
+        self.frame_callback = None  # Callback-Funktion für die GUI-Einbettung des Personenerkennungsbildes
+        self.detection_callback = None  # Speichert die Callback-Funktion
+        self.target_object = "person"  # Definiert das Zielobjekt als "Person"
+        self.running = False  # Kontrollvariable für das Hauptprogramm (Start erst nach GUI-Klick)
+        threading.Thread(target=self.load_model, daemon=True).start() # Starte das Modell-Laden asynchron
 
-# Callback-Funktion, die aufgerufen wird, wenn neue Videodaten ankommen
-def app_callback(pad, info, user_data):
-    buffer = info.get_buffer()  # Extrahiert den Video-Buffer
-    if buffer is None:
-        return Gst.PadProbeReturn.OK  # Falls kein gültiger Buffer vorhanden ist, fortfahren
-    
-    user_data.increment()  # Erhöht den internen Frame-Zähler
-    
-    # Holt das Videoformat und die Abmessungen des Videostreams
-    format, width, height = get_caps_from_pad(pad)
-    frame = None  # Variable zur Speicherung des Videoframes
-    
-    if user_data.use_frame and format is not None and width is not None and height is not None:
-        frame = get_numpy_from_buffer(buffer, format, width, height)  # Konvertiert den Buffer in ein NumPy-Array
-    
-    # Holt die Objekterkennungs-Region aus dem Videostream
-    roi = hailo.get_roi_from_buffer(buffer)  # Extrahiert die Region of Interest (ROI) für die Objekterkennung
-    detections = roi.get_objects_typed(hailo.HAILO_DETECTION)  # Holt erkannte Objekte aus der ROI
-    
-    object_in_zone = False  # Variable zur Überprüfung, ob das Zielobjekt in einer der definierten Zonen ist
-    detection_string = ""  # String zur Anzeige der Erkennungsergebnisse
-    
-    for detection in detections:
-        label = detection.get_label()  # Holt die Objektklasse des erkannten Objekts
-        confidence = detection.get_confidence()  # Vertrauenswürdigkeit der Erkennung
-        
-        # Falls das erkannte Objekt das Zielobjekt ist und die Konfidenz hoch genug ist
-        if confidence > 0.4 and label == user_data.target_object:
-            bbox = detection.get_bbox()  # Holt die Bounding Box des erkannten Objekts
-            x_min = bbox.xmin()  # Linke obere X-Koordinate der Bounding Box
-            y_min = bbox.ymin()  # Linke obere Y-Koordinate der Bounding Box
-            box_width = bbox.width()  # Breite der Bounding Box
-            box_height = bbox.height()  # Höhe der Bounding Box
-            
-            x_max = x_min + box_width  # Rechte untere X-Koordinate
-            y_max = y_min + box_height  # Rechte untere Y-Koordinate
-            
-            # Berechnung der Mitte der Bounding Box
-            center_x = x_min + (box_width / 2)
-            center_y = (y_min + (box_height / 2) - 0.22) * 1.83  # Skalierung und Offset-Korrektur
+        # ROIs als Platzhalter
+        self.roi1 = None # hier werden die Grenzen der ersten ROI gespeichert
+        self.roi2 = None # hier werden die Grenzen der zweiten ROI gespeichert
 
-            # Speichert die Erkennungsdetails als Debug-String
-            detection_string += (f"{label.capitalize()} detected!\n"
-                               f"Position: center=({center_x:.2f}, {center_y:.2f})\n"
-                               f"Bounds: xmin={x_min:.2f}, ymin={y_min:.2f}, xmax={x_max:.2f}, ymax={y_max:.2f}\n"
-                               f"Confidence: {confidence:.2f}\n")
-            
-            # Prüft, ob das erkannte Objekt sich in einer der Zielzonen befindet
-            if ((user_data.zone1_x_min <= center_x <= user_data.zone1_x_max and 
-                user_data.zone1_y_min <= center_y <= user_data.zone1_y_max) or 
-                (user_data.zone2_x_min <= center_x <= user_data.zone2_x_max and 
-                user_data.zone2_y_min <= center_y <= user_data.zone2_y_max)):
-                object_in_zone = True  # Setzt die Variable auf True, falls das Objekt in einer der Zonen liegt
-                detection_string += "Object is in target zone!\n"
-    
-    # Falls sich das Objekt in einer der Zonen befindet, erhöhe den Zähler für in-zone Frames
-    if object_in_zone:
-        user_data.in_zone_frames += 1
-        user_data.out_zone_frames = 0  # Setzt den Zähler für Frames ohne Objekt zurück
-        
-        # Wenn das Objekt 4 aufeinanderfolgende Frames lang in der Zone erkannt wird, schalte das Relais ab
-        if user_data.in_zone_frames >= 4 and not user_data.is_it_active:
-            user_data.is_it_active = True
-            print(f"{user_data.target_object.capitalize()} in Gefahrenzone, Sicherheitskreis wird abgeschaltet!")
-            
-    else:
-        user_data.out_zone_frames += 1
-        user_data.in_zone_frames = 0  # Setzt den Zähler für Frames mit Objekt zurück
-        
-        # Falls das Objekt für 5 aufeinanderfolgende Frames nicht mehr in der Zone erkannt wird, Reaktivierung
-        if user_data.out_zone_frames >= 5 and user_data.is_it_active:
-            user_data.is_it_active = False  # Setzt den Status zurück
-            print(f"{user_data.target_object} nicht mehr in Gefahrenzone, Sicherheitskreis einschalten?!")
-    
-    # Druckt die Erkennungsdetails nur, wenn eine Erkennung stattfand
-    if detection_string:
-        print(detection_string, end='')
-    
-    return Gst.PadProbeReturn.OK  # Setzt die GStreamer Pipeline fort
+        self.object_in_zone1 = False # bool, die anzeigt, ob sich in der ersten ROI eine Person befindet
+        self.object_in_zone2 = False # bool, die anzeigt, ob sich in der zweiten ROI eine Person befindet
+        self.in_zone1_frames = 0  # Anzahl erkannter Frames in der ersten ROI
+        self.out_zone1_frames = 0  # Anzahl der nicht erkannten Frames in der ersten ROI
+        self.in_zone2_frames = 0  # Anzahl erkannter Frames in der zweiten ROI
+        self.out_zone2_frames = 0  # Anzahl der nicht erkannten Frames in der zweiten ROI
+        self.is_active = False  # Gibt an, ob aktuell eine Person erkannt wurde
 
-# Hauptprogramm, das die Anwendung startet
-if __name__ == "__main__":
-    user_data = user_app_callback_class()  # Erstellt ein Objekt der Callback-Klasse
-    app = GStreamerDetectionApp(app_callback, user_data)  # Erstellt die GStreamer-Anwendung mit dem Callback
-    app.run()  # Startet die Anwendung
+    def load_model(self):
+        """Lädt das YOLO-Modell im Hintergrund, um den Start zu beschleunigen."""
+        print("Lade YOLO-Modell...")
+        try:
+            self.model = YOLO(self.model_path) # versucht YOLO-Modell aus dem Pfad zu laden
+            print("YOLO-Modell geladen!")
+        except Exception as e:
+            print("YOLO-Modell konnte nicht geladen werden")
+
+    def set_detection_callback(self, callback):
+        """Setzt eine externe Callback-Funktion für erkannte Objekte."""
+        self.detection_callback = callback
+
+    def set_frame_callback(self, callback):
+        """Setzt eine Callback-Funktion für das aktuelle Erkennungsbild."""
+        self.frame_callback = callback
+
+    def set_rois(self, roi1, roi2):
+        """Speichert die ROIs für die Erkennung."""
+        self.roi1 = roi1
+        self.roi2 = roi2
+        print("keye_detection: ROIs für die Erkennung aktualisiert: ", roi1, roi2)
+
+    def detect_objects(self, frame):
+        """Führt die Objekterkennung mit YOLO durch, zeichnet Bounding Boxes und prüft, ob eine Person in den ROIs ist."""
+        results = self.model(frame, imgsz=320, verbose=False) # führt die Objekterkennung durch und speichert die Ergebnisse
+        detections = results[0].boxes.data.cpu().numpy()  # Extrahiert erkannte Objekte
+
+        if self.roi1 and self.roi2: # stellt sicher, dass die ROIs vorhanden sind
+            for det in detections: # für jedes erkannte Objekt wird die schleife einmal durchlaufen
+                x_min, y_min, x_max, y_max, conf, cls = det[:6] # speichert die Bounding Box des Objektes, die Sicherheit der Erkennung und das Label
+                r1xmin, r1ymin, r1xmax, r1ymax = self.roi1 # speichert die Grenzen der ROI in einzelne Werte ab (nur zur Übersichtlichkeit)
+                r2xmin, r2ymin, r2xmax, r2ymax = self.roi2
+
+                if self.model.names[int(cls)] == self.target_object: # nur wenn eine Person erkannt wird, geht es weiter
+                    #print("Erkanntes Objekt ist Person!")
+
+                    if x_max/1280 < r1xmin or x_min/1280 > r1xmax or y_max/720 < r1ymin or y_min/720 > r1ymax: # überprüft, ob sich die Person außerhalb der ersten ROI befindet
+                        self.object_in_zone1 = False # wenn sich die Person außerhalb der ROI befindet, wird die variable auf falsch gesetzt
+                    else:
+                        #print("detect_objects: Objekt in Zone1")
+                        self.object_in_zone1 = True # wenn sich die Person innerhalb der ROI befindet, wird die variable auf true gesetzt
+
+                    if x_max/1280 < r2xmin or x_min/1280 > r2xmax or y_max/720 < r2ymin or y_min/720 > r2ymax: # überprüft, ob sich die Person außerhalb der zweiten ROI befindet
+                        self.object_in_zone2 = False # wenn sich die Person außerhalb der ROI befindet, wird die variable auf falsch gesetzt
+                    else:
+                        #print("detect_objects: Objekt in Zone2")
+                        self.object_in_zone2 = True # wenn sich die Person innerhalb der ROI befindet, wird die variable auf true gesetzt
+
+            if self.object_in_zone1 or self.object_in_zone2: # wenn sich eine Person in einer der ROIs befindet, wird eine Variable hochgezählt die sicherstellt, dass bei einer kurzen Falscherkennung nicht das Relais direkt schaltet
+                if self.object_in_zone1:
+                    self.in_zone1_frames += 1 # zählt bei Person in der Zone hoch
+                    self.out_zone1_frames = 0 # wird bei Person in der Zone auf null gesetzt
+                if self.object_in_zone2:
+                    self.in_zone2_frames += 1
+                    self.out_zone2_frames = 0
+
+                if (self.in_zone1_frames >= 4 or self.in_zone2_frames >= 4) and not self.is_active: # überprüft, ob die erkannte Person während den letzten vier Frames in der ROI erkannt wurde
+                    self.is_active = True # zeigt an, ob bereits eine Person erkannt wurde
+                    print("detect_objects: Person seit mehr als 4 Frames in ROI")
+                    if self.detection_callback:
+                        self.detection_callback(True) # gibt an die decision per Callback True aus, damit das Relais ausgeschaltet wird
+
+            else: # wenn sich die Person wieder außerhalb der ROI befindet, wird ebenfalls nicht direkt geschaltet, um bei fehlerhafter erkennung außerhalb der ROI nicht direkt wieder einzuschalten
+                self.out_zone1_frames += 1 # zählt hoch, wenn sich die Person, die zuvor in der ROI war aus der ROI rausbewegt
+                self.in_zone1_frames = 0 # wird bei Person außerhalb der Zone wieder auf null gesetzt
+                self.out_zone2_frames += 1
+                self.in_zone2_frames = 0
+
+                if (self.out_zone1_frames >= 4 and self.out_zone2_frames >= 4) and self.is_active: # überprüft, ob die erkannte Person während den letzten vier Frames außerhalb der ROI erkannt wurde
+                    self.is_active = False
+                    print("detect_objects: Person seit min. 4 Frames nicht mehr in ROI")
+                    if self.detection_callback:
+                        self.detection_callback(False) # gibt an die decision per Callback False aus, damit das Relais eingeschaltet wird
+
+        # Zeichne Bounding Boxes auf dem Kamerabild
+        for det in detections:  # Durchläuft alle erkannten Objekte in den Detektionen
+            x_min, y_min, x_max, y_max, conf, cls = det[:6]  # Extrahiert die Bounding-Box-Koordinaten, die Konfidenz und die Klasse
+            label = f"{self.model.names[int(cls)]}: {conf:.2f}"  # Erstellt eine Label-Beschriftung mit Klassenname und Konfidenzwert
+            cv2.rectangle(frame, (int(x_min), int(y_min)), (int(x_max), int(y_max)), (0, 255, 0), 2)  # Zeichnet ein grünes Rechteck um das erkannte Objekt
+            cv2.putText(frame, label, (int(x_min), int(y_min) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0),2)  # Fügt die Label-Beschriftung über der Bounding Box hinzu
+
+        # Zeichne die ROIs als Rechtecke
+        height, width, _ = frame.shape  # Bestimmt die Höhe und Breite des aktuellen Frames
+        roi1_px = (int(self.roi1[0] * width), int(self.roi1[1] * height), int(self.roi1[2] * width),
+                   int(self.roi1[3] * height))  # Berechnet die ROI 1-Koordinaten in Pixeln
+        roi2_px = (int(self.roi2[0] * width), int(self.roi2[1] * height), int(self.roi2[2] * width),
+                   int(self.roi2[3] * height))  # Berechnet die ROI 2-Koordinaten in Pixeln
+
+        cv2.rectangle(frame, (roi1_px[0], roi1_px[1]), (roi1_px[2], roi1_px[3]), (255, 0, 0), 2)  # Zeichnet ein blaues Rechteck für ROI 1
+        cv2.rectangle(frame, (roi2_px[0], roi2_px[1]), (roi2_px[2], roi2_px[3]), (0, 0, 255), 2)  # Zeichnet ein rotes Rechteck für ROI 2
+
+        return frame  # Gibt das annotierte Frame zurück
+
+    def run(self):
+        """Startet die Objekterkennung in einer Schleife."""
+        if not self.roi1 or not self.roi2:  # Prüft, ob die ROIs gesetzt sind
+            print("ROIs nicht gesetzt! Starte nicht.")  # Gibt eine Fehlermeldung aus, wenn keine ROIs definiert sind
+            return  # Beendet die Funktion, falls keine ROIs vorhanden sind
+
+        self.running = True  # Setzt den Status auf "laufend"
+        print("Erkennung läuft...")  # Gibt eine Statusmeldung aus
+
+        while self.cap.isOpened() and self.running:  # Schleife läuft, solange die Kamera geöffnet ist und das Programm aktiv bleibt
+            ret, frame = self.cap.read()  # Liest ein Bild von der Kamera
+            if not ret:  # Falls kein Bild gelesen werden kann, wird die Schleife beendet
+                break
+
+            frame_rgb = cv2.cvtColor(cv2.flip(frame, 1), cv2.COLOR_BGR2RGB)  # Spiegelt das Bild horizontal und konvertiert es von BGR nach RGB
+            frame_annotated = self.detect_objects(frame_rgb)  # Ruft die Objekterkennung auf und annotiert das Bild
+
+            # Übergibt das verarbeitete Bild an die GUI
+            if self.frame_callback:
+                self.frame_callback(frame_annotated)  # Führt die Callback-Funktion aus, falls vorhanden
+
+        self.cap.release()  # Gibt die Kameraressourcen frei
+        cv2.destroyAllWindows()  # Schließt alle OpenCV-Fenster
+        print("Erkennung gestoppt.")  # Gibt eine Statusmeldung aus
+
+    def stop(self):
+        """Stoppt die Objekterkennung sicher."""
+        self.running = False  # Setzt den Status auf "nicht laufend"
+        print("Erkennung wird gestoppt...")  # Gibt eine Statusmeldung aus

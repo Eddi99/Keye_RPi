@@ -1,7 +1,7 @@
 import os  # Importiert das OS-Modul für den direkten Zugriff auf /dev/hidrawX
 
 class RelaisControl:
-    def __init__(self, hidraw_path="/dev/hidraw0"):
+    def __init__(self, hidraw_path="/dev/hidraw2"):
         """ Initialisiert das Relais-Kontrollsystem und stellt die Verbindung her. """
         self.hidraw_path = hidraw_path  # Speichert den Pfad zum HIDRAW-Gerät
         self.device = None  # Initialisiert die Gerät-Variable als None
@@ -19,7 +19,8 @@ class RelaisControl:
     def close_device(self):
         """ Schließt die Verbindung zum Relais. """
         if self.device:  # Überprüft, ob das Gerät geöffnet ist
-            self.device.close()  # Schließt das HIDRAW-Gerät
+			# self.off_all() # stellt beim Beenden das Relais aus
+            self.device.close()  # Trennt das HIDRAW-Relais
             self.device = None  # Setzt die Gerätevariable zurück
             print("Relais getrennt")  # Bestätigungsausgabe
 
