@@ -4,7 +4,7 @@ from ultralytics import YOLO  # YOLO für Objekterkennung
 
 
 class ObjectDetection:
-    def __init__(self, model_path="yolo11n_ncnn_model"):
+    def __init__(self, model_path="yolo11s_ncnn_model"):
         self.cap = cv2.VideoCapture(0)  # Öffnet die Kamera mit Index 0, falls kamera  nicht erkannt ggf. ändern
         self.model_path = model_path # speichert den Pfad zum Yolo-Modell, dass an die Klasse übergeben wird
         self.model = None # PLatzhalter für das Yolo-Modell
@@ -32,7 +32,8 @@ class ObjectDetection:
         """Lädt das YOLO-Modell im Hintergrund, um den Start zu beschleunigen."""
         print("Lade YOLO-Modell...")
         try:
-            self.model = YOLO(self.model_path) # versucht YOLO-Modell aus dem Pfad zu laden
+            self.model = YOLO(self.model_path, task='detect') # versucht YOLO-Modell aus dem Pfad zu laden
+
             print("YOLO-Modell geladen!")
         except Exception as e:
             print("YOLO-Modell konnte nicht geladen werden")

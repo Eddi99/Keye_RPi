@@ -1,7 +1,7 @@
 import os  # Importiert das OS-Modul für den direkten Zugriff auf /dev/hidrawX
 
 class RelaisControl:
-    def __init__(self, hidraw_path="/dev/hidraw2"):
+    def __init__(self, hidraw_path="/dev/usbrelay"):
         """ Initialisiert das Relais-Kontrollsystem und stellt die Verbindung her. """
         self.hidraw_path = hidraw_path  # Speichert den Pfad zum HIDRAW-Gerät
         self.device = None  # Initialisiert die Gerät-Variable als None

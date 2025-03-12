@@ -71,11 +71,11 @@ class GUIApp(QWidget):
 
     def capture_frame(self):
         """Nimmt Einzelbild zum Setzen der ROIs auf"""
-        cap = cv2.VideoCapture(0)  # Öffnet die Kamera mit Index 1
+        cap = self.logic.detector.cap  # Nutze das bereits geöffnete Kamera-Objekt aus keye_detection.py
         cap.set(3, 1280)  # Setzt die Breite des Kamera-Frames auf 1280 Pixel
         cap.set(4, 720)  # Setzt die Höhe des Kamera-Frames auf 720 Pixel
         ret, frame = cap.read()  # Nimmt ein Einzelbild auf
-        cap.release()  # Schließt die Kamera
+        #cap.release()  # Schließt die Kamera
 
         if ret:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)  # Konvertiert das Bild in RGB
