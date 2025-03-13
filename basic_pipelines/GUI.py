@@ -256,4 +256,9 @@ class GUIApp(QWidget):
 		if result == 1:  # Fenster schließen
 			self.logic.shutdown()
 			self.close()
+		elif result == 2:
+			self.logic.shutdown()
+			os.system("sudo shutdown -h now")
+			self.close()
+			
 
