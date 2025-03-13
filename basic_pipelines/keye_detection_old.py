@@ -3,9 +3,12 @@ import os  # Importiert das OS-Modul für Betriebssystem-Interaktionen
 import numpy as np  # Importiert NumPy für numerische Berechnungen
 import cv2  # Importiert OpenCV für Bildverarbeitung
 import hailo  # Importiert die Hailo-Bibliothek für KI-gestützte Objekterkennung
-from hailo_apps_infra.hailo_rpi_common import (get_caps_from_pad, get_numpy_from_buffer, app_callback_class,)
+from hailo_apps_infra.hailo_rpi_common import (
+    get_caps_from_pad,  # Funktion zum Abrufen der Eigenschaften des Videostreams
+    get_numpy_from_buffer,  # Konvertiert den Video-Buffer in ein NumPy-Array
+    app_callback_class,  # Basis-Klasse für Callback-Funktionen
+)
 from hailo_apps_infra.detection_pipeline import GStreamerDetectionApp  # Importiert die Hailo GStreamer App-Klasse
-
 from gpiozero import LED  # Importiert GPIOZero zur Steuerung der LEDs
 
 gi.require_version('Gst', '1.0')  # Stellt sicher, dass GStreamer mit Version 1.0 geladen wird
