@@ -9,5 +9,5 @@ if __name__ == "__main__":  # Prüft, ob das Skript direkt ausgeführt wird
     # Startet die GUI direkt im Hauptthread (wichtig für PyQt)
     app = QApplication(sys.argv)  # Erstellt eine QApplication-Instanz für die GUI-Steuerung
     window = GUIApp(logic)  # Erstellt das Hauptfenster der GUI und übergibt die Steuerlogik
-    window.showMaximized()  # Zeigt die GUI maximiert an
+    window.showFullScreen()  # Zeigt die GUI maximiert an
     sys.exit(app.exec())  # Startet die GUI-Eventloop und hält das Programm am Laufen

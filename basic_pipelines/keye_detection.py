@@ -86,7 +86,7 @@ class ObjectDetection:
                     self.in_zone2_frames += 1
                     self.out_zone2_frames = 0
 
-                if (self.in_zone1_frames >= 4 or self.in_zone2_frames >= 4) and not self.is_active: # überprüft, ob die erkannte Person während den letzten vier Frames in der ROI erkannt wurde
+                if (self.in_zone1_frames >= 3 or self.in_zone2_frames >= 3) and not self.is_active: # überprüft, ob die erkannte Person während den letzten n Frames in der ROI erkannt wurde
                     self.is_active = True # zeigt an, ob bereits eine Person erkannt wurde
                     print("detect_objects: Person seit mehr als 4 Frames in ROI")
                     if self.detection_callback:
@@ -98,7 +98,7 @@ class ObjectDetection:
                 self.out_zone2_frames += 1
                 self.in_zone2_frames = 0
 
-                if (self.out_zone1_frames >= 4 and self.out_zone2_frames >= 4) and self.is_active: # überprüft, ob die erkannte Person während den letzten vier Frames außerhalb der ROI erkannt wurde
+                if (self.out_zone1_frames >= 3 and self.out_zone2_frames >= 3) and self.is_active: # überprüft, ob die erkannte Person während den letzten n Frames außerhalb der ROI erkannt wurde
                     self.is_active = False
                     print("detect_objects: Person seit min. 4 Frames nicht mehr in ROI")
                     if self.detection_callback:
@@ -119,7 +119,7 @@ class ObjectDetection:
                    int(self.roi2[3] * height))  # Berechnet die ROI 2-Koordinaten in Pixeln
 
         cv2.rectangle(frame, (roi1_px[0], roi1_px[1]), (roi1_px[2], roi1_px[3]), (255, 0, 0), 2)  # Zeichnet ein blaues Rechteck für ROI 1
-        cv2.rectangle(frame, (roi2_px[0], roi2_px[1]), (roi2_px[2], roi2_px[3]), (0, 0, 255), 2)  # Zeichnet ein rotes Rechteck für ROI 2
+        cv2.rectangle(frame, (roi2_px[0], roi2_px[1]), (roi2_px[2], roi2_px[3]), (255, 0, 0), 2)  # Zeichnet ein blaues Rechteck für ROI 2
 
         return frame  # Gibt das annotierte Frame zurück
 
@@ -145,7 +145,6 @@ class ObjectDetection:
                 self.frame_callback(frame_annotated)  # Führt die Callback-Funktion aus, falls vorhanden
 
         self.cap.release()  # Gibt die Kameraressourcen frei
-        cv2.destroyAllWindows()  # Schließt alle OpenCV-Fenster
         print("Erkennung gestoppt.")  # Gibt eine Statusmeldung aus
 
     def stop(self):

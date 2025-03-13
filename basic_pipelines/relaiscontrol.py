@@ -19,7 +19,6 @@ class RelaisControl:
     def close_device(self):
         """ Schließt die Verbindung zum Relais. """
         if self.device:  # Überprüft, ob das Gerät geöffnet ist
-			# self.off_all() # stellt beim Beenden das Relais aus
             self.device.close()  # Trennt das HIDRAW-Relais
             self.device = None  # Setzt die Gerätevariable zurück
             print("Relais getrennt")  # Bestätigungsausgabe
@@ -32,10 +31,10 @@ class RelaisControl:
                 self.device.flush()  # Stellt sicher, dass die Daten sofort übertragen werden
                 return True  # Gibt True zurück, falls der Schreibvorgang erfolgreich war
             except Exception as e:
-                print(f"Relaisbefehl konnte nicht geschrieben werden: {e}")  # Gibt eine Fehlermeldung aus, falls ein Fehler auftritt
+                print(f"XXX Relaisbefehl konnte nicht geschrieben werden: {e}")  # Gibt eine Fehlermeldung aus, falls ein Fehler auftritt
                 return False  # Gibt False zurück, falls der Befehl nicht gesendet werden konnte
         else:
-            print("Relais ist nicht verbunden")  # Falls das Gerät nicht verbunden ist, gibt es eine Warnung aus
+            print("XXX Relais ist nicht verbunden")  # Falls das Gerät nicht verbunden ist, gibt es eine Warnung aus
             return False  # Gibt False zurück, da kein Befehl gesendet wurde
 
     def on_all(self):
@@ -44,7 +43,7 @@ class RelaisControl:
             print("Relais wurde eingeschaltet")  # Bestätigungsausgabe
             return True  # Gibt True zurück, falls erfolgreich
         else:
-            print("Relais kann nicht eingeschaltet werden")  # Falls der Befehl fehlschlägt, wird eine Warnung ausgegeben
+            print("XXX Relais kann nicht eingeschaltet werden")  # Falls der Befehl fehlschlägt, wird eine Warnung ausgegeben
             return False  # Gibt False zurück
 
     def off_all(self):
@@ -53,5 +52,5 @@ class RelaisControl:
             print("Relais wurde ausgeschaltet")  # Bestätigungsausgabe
             return True  # Gibt True zurück, falls erfolgreich
         else:
-            print("RElais konnte nicht ausgeschaltet werden")  # Falls der Befehl fehlschlägt, wird eine Warnung ausgegeben
+            print("XXX Relais konnte nicht ausgeschaltet werden")  # Falls der Befehl fehlschlägt, wird eine Warnung ausgegeben
             return False  # Gibt False zurück
