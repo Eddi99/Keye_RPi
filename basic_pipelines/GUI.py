@@ -12,6 +12,8 @@ class GUIApp(QWidget):
 		self.logic = logic  # Speichert die Referenz zur Entscheidungslogik
 
 		# Initialisierung aller Instanzvariablen vor UI-Aufbau
+		self.image_width = 0 # Speichert die Breite des im Fenster angezeigten Bildes
+		self.image_height = 0 # Speichert die Höhe des im Fenster angezeigten Bildes
 		self.roi_points = []  # Liste zum Speichern der gesetzten ROI-Punkte
 		self.temp_roi = None  # Temporäres Rechteck während des Aufziehens
 		self.image = None  # Variable zum Speichern des aktuellen Kamerabilds
@@ -30,76 +32,71 @@ class GUIApp(QWidget):
 		"""Initialisiert die UI mit Button-Anordnung und Bildgröße"""
 		self.setWindowTitle("Keye UI")  
 
-		# Bildschirmgröße abrufen
-		screen_size = QApplication.primaryScreen().size()
+		screen_size = QApplication.primaryScreen().size() # Bildschirmgröße abrufen
 		screen_width = screen_size.width()
 		screen_height = screen_size.height()
 
-		# Fenstergröße anpassen
-		self.setGeometry(0, 0, int(screen_width * 0.9), int(screen_height * 0.9))
+		self.setGeometry(0, 0, int(screen_width * 0.9), int(screen_height * 0.9)) # Fenstergröße anpassen
 		self.image_width = int(screen_width * 0.85)
 		self.image_height = int(screen_height * 0.85)  
 
-		# Bildanzeige-Label (zentriert)
-		self.label = QLabel(self)
+		
+		self.label = QLabel(self) # Bildanzeige-Label
 		self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 		self.label.setFixedSize(self.image_width, self.image_height)  
 
-		# Button-Höhe berechnen (10% der Bildschirmhöhe)
-		button_height = int(screen_height * 0.1)
+		button_height = int(screen_height * 0.1) # Button-Höhe berechnen (10% der Bildschirmhöhe)
 
-		# BUTTONS ERSTELLEN (feste Reihenfolge & Höhe)
-		self.retake_picture_button = QPushButton("Bild erneut aufnehmen", self)
-		self.retake_picture_button.setFixedHeight(button_height)
-		self.retake_picture_button.setStyleSheet("background-color: gray; color: white; font-weight: bold; border: none;")
-		self.retake_picture_button.clicked.connect(self.capture_frame)  # Bild erneut aufnehmen
+		# Buttons erstellen
+		self.retake_picture_button = QPushButton("Bild erneut aufnehmen", self) # Buttontext festlegen
+		self.retake_picture_button.setFixedHeight(button_height) # Buttonhöhe festsetzen
+		self.retake_picture_button.setStyleSheet("background-color: gray; color: white; font-weight: bold; border: none;") # Buttonoptik festlegen
+		self.retake_picture_button.clicked.connect(self.capture_frame)  # Zuweisen der Buttonfunktion: Bild erneut aufnehmen
 
 		self.roi_reset_button = QPushButton("ROI Reset", self)
 		self.roi_reset_button.setFixedHeight(button_height)
 		self.roi_reset_button.setStyleSheet("background-color: gray; color: white; font-weight: bold; border: none;")
-		self.roi_reset_button.clicked.connect(self.roi_reset)  # ROI zurücksetzen
+		self.roi_reset_button.clicked.connect(self.roi_reset)  # Zuweisen der Buttonfunktion: ROI zurücksetzen
 
 		self.confirm_button = QPushButton("Bestätigen und Starten", self)
 		self.confirm_button.setFixedHeight(button_height)
 		self.confirm_button.setStyleSheet("background-color: gray; color: white; font-weight: bold; border: none;")
 		self.confirm_button.setVisible(False)  # Anfangs unsichtbar
-		self.confirm_button.clicked.connect(self.confirm_rois)  # ROIs bestätigen und starten
+		self.confirm_button.clicked.connect(self.confirm_rois)  # Zuweisen der Buttonfunktion: ROIs bestätigen und starten
 
 		self.relais_on_button = QPushButton("Relais EIN", self)
 		self.relais_on_button.setFixedHeight(button_height)
 		self.relais_on_button.setStyleSheet("background-color: green; color: white; font-weight: bold; border: none;")
 		self.relais_on_button.setVisible(False)  # Anfangs unsichtbar
-		self.relais_on_button.clicked.connect(self.logic.relais.on_all)  # Relais einschalten
+		self.relais_on_button.clicked.connect(self.logic.relais.on_all)  # Zuweisen der Buttonfunktion: Relais einschalten
 
 		self.relais_off_button = QPushButton("Relais AUS", self)
 		self.relais_off_button.setFixedHeight(button_height)
 		self.relais_off_button.setStyleSheet("background-color: red; color: white; font-weight: bold; border: none;")
 		self.relais_off_button.setVisible(False)  # Anfangs unsichtbar
-		self.relais_off_button.clicked.connect(self.logic.relais.off_all)  # Relais ausschalten
+		self.relais_off_button.clicked.connect(self.logic.relais.off_all)  # Zuweisen der Buttonfunktion: Relais ausschalten
 
 		self.exit_button = QPushButton("Beenden", self)
 		self.exit_button.setFixedHeight(button_height)
 		self.exit_button.setStyleSheet("background-color: gray; color: white; font-weight: bold; border: none;")
-		self.exit_button.clicked.connect(self.closeEvent)  # Programm sicher beenden
+		self.exit_button.clicked.connect(self.closeEvent)  # Zuweisen der Buttonfunktion: Programm sicher beenden
 
-		# BUTTON-ANORDNUNG (HORIZONTAL & FESTE REIHENFOLGE)
-		button_layout = QHBoxLayout()
-		button_layout.addWidget(self.retake_picture_button)
+		button_layout = QHBoxLayout() # Button-Anordnung horizontal
+		button_layout.addWidget(self.retake_picture_button) # Hinzufügen der Buttons zum Button-Layout
 		button_layout.addWidget(self.confirm_button)
 		button_layout.addWidget(self.roi_reset_button)
 		button_layout.addWidget(self.relais_on_button)
 		button_layout.addWidget(self.relais_off_button)
 		button_layout.addWidget(self.exit_button)
 
-		# HAUPTLAYOUT (BILD OBEN, BUTTONS UNTEN)
-		layout = QVBoxLayout()
+		layout = QVBoxLayout() # Hauptlayout vertikal angeordent
 		layout.addStretch()  # Platz vor dem Bild für Zentrierung
-		layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignCenter)
+		layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignCenter) # Bild ins Layout einfügen
 		layout.addStretch()  # Platz nach dem Bild
-		layout.addLayout(button_layout)
+		layout.addLayout(button_layout) # Button-Anordnung zur Hauptanordnung hinzufügen
 
-		self.setLayout(layout)
-		self.capture_frame()
+		self.setLayout(layout) # Anwenden des Layouts
+		self.capture_frame() # aufrufen der capture_frame, nimmt das Bild zur Festlegung der ROIs auf
 
 	def capture_frame(self):
 		"""Nimmt Einzelbild zum Setzen der ROIs auf"""
@@ -144,21 +141,21 @@ class GUIApp(QWidget):
 				painter.drawRect(x1, y1, x2 - x1, y2 - y1)  # Zeichnet das Rechteck
 
 		if self.temp_roi:
-			x1, y1, x2, y2 = self.temp_roi
-			painter.drawRect(x1, y1, x2 - x1, y2 - y1)
+			x1, y1, x2, y2 = self.temp_roi # setzt Variablen zum berechnen der ROI-Koordinaten
+			painter.drawRect(x1, y1, x2 - x1, y2 - y1) # zeichnet die ROIs auf dem Bild ein
 
 		painter.end()  # Beendet den Painter
 		return pixmap  # Gibt das geänderte Bild zurück
 
 	def mousePressEvent(self, event):
 		"""Erfasst die Mausposition, speichert die ROI-Punkte und zeigt ein temporäres Rechteck an."""
-		if len(self.roi_points) < 4:
-			x = int(event.pos().x() - self.label.geometry().x())
-			y = int(event.pos().y() - self.label.geometry().y())  # Korrigiert die Mausposition relativ zum Bild
+		if len(self.roi_points) < 4: # Solange noch nicht die beiden ROIs festgelegt sind können weitere Punkte festgelegt werden
+			x = int(event.pos().x() - self.label.geometry().x()) # Korrigiert die Mausposition relativ zum Bild
+			y = int(event.pos().y() - self.label.geometry().y())
 			x = max(0, min(x, self.label.width() - 1))
 			y = max(0, min(y, self.label.height() - 1))
 			self.roi_points.append((x, y))
-			self.temp_roi = (x, y, x, y)  # Setzt das temporäre Rechteck
+			self.temp_roi = (x, y, x, y)  # Speichert die ROI temporär
 			print(f"mousePressEvent: ROI {self.current_roi}: Punkt {len(self.roi_points) % 2 + 1} gesetzt: {x}, {y}")
 			self.show_frame()  # zeigt das Bild aktualisiert mit den aktuellen ROIs an, falls es welche gibt
 			if len(self.roi_points) >= 4 and self.confirm_button_bool:
@@ -215,48 +212,43 @@ class GUIApp(QWidget):
 		dialog.setWindowTitle("Beenden")
 		dialog.setFixedSize(int(self.image_width / 1.5), int(self.image_height / 3))  # Größe für Touchscreen optimiert
 
-		# Nachrichtentext (zentriert)
-		label = QLabel("Möchtest du das Fenster schließen oder den Raspberry Pi herunterfahren?", dialog)
+		label = QLabel("Möchtest du das Fenster schließen oder den Raspberry Pi herunterfahren?", dialog) # Nachrichtentext
 		label.setStyleSheet("font-size: 18px;")  # Größere Schrift für bessere Lesbarkeit
 		label.setAlignment(Qt.AlignCenter)  # Zentriert den Text horizontal & vertikal
 
-		# Buttons mit fester Reihenfolge und Touchscreen-Größe
-		button_size = (int(self.image_width / 5), int(self.image_height / 8))
+		button_size = (int(self.image_width / 5), int(self.image_height / 8)) # Buttons mit fester Reihenfolge und Touchscreentauglicher-Größe
 
-		close_button = QPushButton("Fenster schließen", dialog)
-		close_button.setFixedSize(*button_size)
-		close_button.setStyleSheet("background-color: gray; color: white; border: none;")
-		close_button.clicked.connect(lambda: dialog.done(1))  # Code 1 → Fenster schließen
+		close_button = QPushButton("Fenster schließen", dialog) # Buttontext setzen
+		close_button.setFixedSize(*button_size) # Buttongröße festsetzen
+		close_button.setStyleSheet("background-color: gray; color: white; border: none;") # Buttonoptik festlegen
+		close_button.clicked.connect(lambda: dialog.done(1))  # Lambda = 1 → Fenster schließen
 
 		shutdown_button = QPushButton("RPi herunterfahren", dialog)
 		shutdown_button.setFixedSize(*button_size)
 		shutdown_button.setStyleSheet("background-color: gray; color: white; border: none;")
-		shutdown_button.clicked.connect(lambda: dialog.done(2))  # Code 2 → Pi herunterfahren
+		shutdown_button.clicked.connect(lambda: dialog.done(2))  # Lambda = 2 → Pi herunterfahren
 
 		cancel_button = QPushButton("Abbrechen", dialog)
 		cancel_button.setFixedSize(*button_size)
 		cancel_button.setStyleSheet("background-color: gray; color: white; border: none;")
-		cancel_button.clicked.connect(lambda: dialog.done(0))  # Code 0 → Abbrechen
+		cancel_button.clicked.connect(lambda: dialog.done(0))  # Lambda = 0 → Abbrechen
 
-		# Layout für Buttons (feste Reihenfolge)
-		button_layout = QHBoxLayout()
+		button_layout = QHBoxLayout() # Horizontales Layout für Buttons
 		button_layout.addWidget(close_button)
 		button_layout.addWidget(shutdown_button)
 		button_layout.addWidget(cancel_button)
 
-		# Hauptlayout
-		layout = QVBoxLayout(dialog)
+		layout = QVBoxLayout(dialog) # Vertikales Hauptlayout
 		layout.addWidget(label)
 		layout.addLayout(button_layout)
 		dialog.setLayout(layout)
 
-		# Zeige den Dialog und warte auf die Auswahl
-		result = dialog.exec()
+		result = dialog.exec() # Zeige den Dialog und warte auf die Auswahl
 
 		if result == 1:  # Fenster schließen
 			self.logic.shutdown()
 			self.close()
-		elif result == 2:
+		elif result == 2: # RPi herunterfahren
 			self.logic.shutdown()
 			os.system("sudo shutdown -h now")
 			self.close()
