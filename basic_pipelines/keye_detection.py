@@ -1,21 +1,23 @@
+"""Für diesen Teil des Projektes wurde als Vorlage ein Programm von Core-electronics verwendet, dass unter folgendem Link zu finden ist:
+https://core-electronics.com.au/guides/raspberry-pi/yolo-object-detection-on-the-raspberry-pi-ai-hat-writing-custom-python/
+Das Programm wurde stark verändert, verbessert und auf die Situation angepasst, dennoch bot es eine ausgezeichnete Grundlage für die Objekterkennung mit YOLO"""
 import cv2  # OpenCV für Bildverarbeitung
 import threading
-import hailort  # HailoRT für die Hardware-Beschleunigung
-import numpy as np  # Falls noch nicht importiert
-
+from ultralytics import YOLO  # YOLO für Objekterkennung
 
 
 class ObjectDetection:
-	def __init__(self):
+	def __init__(self, model_path="yolo11s_ncnn_model"):
 		self.cap = cv2.VideoCapture(0)  # Öffnet die Kamera mit Index 0, falls kamera  nicht erkannt ggf. ändern
+		self.model_path = model_path # speichert den Pfad zum Yolo-Modell, dass an die Klasse übergeben wird
+		self.model = None # PLatzhalter für das Yolo-Modell
 		self.cap.set(3, 1280)  # Setzt die Breite des Kamera-Frames auf 1280 Pixel
 		self.cap.set(4, 720)  # Setzt die Höhe des Kamera-Frames auf 720 Pixel
 		self.frame_callback = None  # Callback-Funktion für die GUI-Einbettung des Personenerkennungsbildes
 		self.detection_callback = None  # Speichert die Callback-Funktion
+		self.target_object = "person"  # Definiert das Zielobjekt als "Person"
 		self.running = False  # Kontrollvariable für das Hauptprogramm (Start erst nach GUI-Klick)
-		self.device = None  # Hailo-Gerät
-		self.network_group = None  # Hailo-Netzwerk
-		self.load_model()
+		threading.Thread(target=self.load_model, daemon=True).start() # Starte das Modell-Laden asynchron
 
 		# ROIs als Platzhalter
 		self.roi1 = None # hier werden die Grenzen der ersten ROI gespeichert
@@ -30,14 +32,14 @@ class ObjectDetection:
 		self.is_active = False  # Gibt an, ob aktuell eine Person erkannt wurde
 
 	def load_model(self):
-		"""Lädt das Hailo-Modell und initialisiert das Device"""
+		"""Lädt das YOLO-Modell im Hintergrund, um den Start zu beschleunigen."""
+		print("Lade YOLO-Modell...")
 		try:
-			self.device = hailort.Device()
-			self.network_group = self.device.create_hef("/home/EdgarCoy/Keye_RPi/resources/yolov8s_h8l.hef")
-			self.network_group.activate()
-			print("Hailo-Modell geladen!")
+			self.model = YOLO(self.model_path, task='detect') # versucht YOLO-Modell aus dem Pfad zu laden
+
+			print("YOLO-Modell geladen!")
 		except Exception as e:
-			print(f"Fehler beim Laden des Hailo-Modells: {e}")
+			print("YOLO-Modell konnte nicht geladen werden")
 
 	def set_detection_callback(self, callback):
 		"""Setzt eine externe Callback-Funktion für erkannte Objekte."""
@@ -52,28 +54,11 @@ class ObjectDetection:
 		self.roi1 = roi1
 		self.roi2 = roi2
 		print("keye_detection: ROIs für die Erkennung aktualisiert: ", roi1, roi2)
-		
-	def preprocess_frame(self, frame):
-		"""Wandelt das Bild in das Hailo-Format um"""
-		frame_resized = cv2.resize(frame, (224, 224))
-		frame_normalized = frame_resized.astype(np.float32) / 255.0
-		frame_input = np.expand_dims(frame_normalized, axis=0)
-		return frame_input
-		
-	def parse_hailo_output(self, output):
-		"""Konvertiert die Hailo-Ausgabe in Bounding Boxes mit Klassenlabels."""
-		detections = []
-		for obj in output:  # Hailo gibt eine Liste mit Objektdaten zurück
-			x_min, y_min, x_max, y_max, conf, cls = obj[:6]  # Bounding Box + Klassenzuweisung
-			if conf > 0.5:  # Konfidenzfilter (anpassbar)
-				detections.append((x_min, y_min, x_max, y_max, conf, cls))
-		return detections
 
 	def detect_objects(self, frame):
 		"""Führt die Objekterkennung mit YOLO durch, zeichnet Bounding Boxes und prüft, ob eine Person in den ROIs ist."""
-		input_tensor = self.preprocess_frame(frame)
-		output = self.network_group.run(input_tensor)[0]  # Hailo-Ausgabe
-		detections = self.parse_hailo_output(output)  # Verarbeitung der Hailo-Ergebnisse
+		results = self.model(frame, imgsz=320, verbose=False) # führt die Objekterkennung durch und speichert die Ergebnisse
+		detections = results[0].boxes.data.cpu().numpy()  # Extrahiert erkannte Objekte
 
 		if self.roi1 and self.roi2: # stellt sicher, dass die ROIs vorhanden sind
 			for det in detections: # für jedes erkannte Objekt wird die schleife einmal durchlaufen
@@ -81,19 +66,16 @@ class ObjectDetection:
 				r1xmin, r1ymin, r1xmax, r1ymax = self.roi1 # speichert die Grenzen der ROI in einzelne Werte ab (nur zur Übersichtlichkeit)
 				r2xmin, r2ymin, r2xmax, r2ymax = self.roi2
 
-				if int(cls) == 0:  # 0 = Person (Hailo Model Mapping)
-					#print("Erkanntes Objekt ist Person!")
+				if self.model.names[int(cls)] == self.target_object: # nur wenn eine Person erkannt wird, geht es weiter
 
 					if x_max/1280 < r1xmin or x_min/1280 > r1xmax or y_max/720 < r1ymin or y_min/720 > r1ymax: # überprüft, ob sich die Person außerhalb der ersten ROI befindet
 						self.object_in_zone1 = False # wenn sich die Person außerhalb der ROI befindet, wird die variable auf falsch gesetzt
 					else:
-						#print("detect_objects: Objekt in Zone1")
 						self.object_in_zone1 = True # wenn sich die Person innerhalb der ROI befindet, wird die variable auf true gesetzt
 
 					if x_max/1280 < r2xmin or x_min/1280 > r2xmax or y_max/720 < r2ymin or y_min/720 > r2ymax: # überprüft, ob sich die Person außerhalb der zweiten ROI befindet
 						self.object_in_zone2 = False # wenn sich die Person außerhalb der ROI befindet, wird die variable auf falsch gesetzt
 					else:
-						#print("detect_objects: Objekt in Zone2")
 						self.object_in_zone2 = True # wenn sich die Person innerhalb der ROI befindet, wird die variable auf true gesetzt
 
 			if self.object_in_zone1 or self.object_in_zone2: # wenn sich eine Person in einer der ROIs befindet, wird eine Variable hochgezählt die sicherstellt, dass bei einer kurzen Falscherkennung nicht das Relais direkt schaltet
@@ -125,7 +107,7 @@ class ObjectDetection:
 		# Zeichne Bounding Boxes auf dem Kamerabild
 		for det in detections:  # Durchläuft alle erkannten Objekte in den Detektionen
 			x_min, y_min, x_max, y_max, conf, cls = det[:6]  # Extrahiert die Bounding-Box-Koordinaten, die Konfidenz und die Klasse
-			label = f"Person: {conf:.2f}" # Erstellt eine Label-Beschriftung mit Klassenname und Konfidenzwert
+			label = f"{self.model.names[int(cls)]}: {conf:.2f}"  # Erstellt eine Label-Beschriftung mit Klassenname und Konfidenzwert
 			cv2.rectangle(frame, (int(x_min), int(y_min)), (int(x_max), int(y_max)), (0, 255, 0), 2)  # Zeichnet ein grünes Rechteck um das erkannte Objekt
 			cv2.putText(frame, label, (int(x_min), int(y_min) - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0),2)  # Fügt die Label-Beschriftung über der Bounding Box hinzu
 
@@ -166,8 +148,6 @@ class ObjectDetection:
 		print("Erkennung gestoppt.")  # Gibt eine Statusmeldung aus
 
 	def stop(self):
-		self.running = False
-		print("Erkennung wird gestoppt...")
-		self.network_group.deactivate()
-		self.device.close()
-
+		"""Stoppt die Objekterkennung sicher."""
+		self.running = False  # Setzt den Status auf "nicht laufend"
+		print("Erkennung wird gestoppt...")  # Gibt eine Statusmeldung aus

@@ -42,7 +42,7 @@ class GUIApp(QWidget):
 		
 		self.banner_label = QLabel("Willkommen! Bitte spannen Sie zwei Sicherheitszonen auf, indem Sie jeweils zwei Eckpunkte anklicken oder nehmen Sie das Bild erneut auf.",self)  # Info-Banner initialisieren
 		self.banner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-		self.banner_label.setStyleSheet("font-size: 16px; font-weight: bold; color: black;")
+		self.banner_label.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
 		
 		self.label = QLabel(self) # Bildanzeige-Fenster (Label) im Layout
 		self.label.setAlignment(Qt.AlignmentFlag.AlignCenter) # Fenster mittig im Layout platzieren
@@ -210,9 +210,9 @@ class GUIApp(QWidget):
 		detection_thread.start()
 
 	def roi_reset(self):
-		elf.banner_label.setText("Bitte spannen Sie zwei Sicherheitszonen auf, indem Sie jeweils zwei Eckpunkte anklicken oder nehmen Sie das Bild erneut auf.")  # Nutzerinfo aktualisieren
-		self.roi_points.clear()  # leert die Liste der gesetzten ROI-punkte
-		self.roi_points.clear()  # leert die Liste der gesetzten ROI-punkte
+		self.banner_label.setText("Bitte spannen Sie zwei Sicherheitszonen auf, indem Sie jeweils zwei Eckpunkte anklicken oder nehmen Sie das Bild erneut auf.")  # Nutzerinfo aktualisieren
+		self.roi_points.clear()  # leert die Liste der gesetzten ROI-Punkte
+		self.roi_points.clear()  # leert die Liste der gesetzten ROI-Punkte
 		self.show_frame()  # zeigt das Bild aktualisiert ohne ROIs
 		self.retake_picture_button.setVisible(True) # aktiviert den Bild noch einmal aufnehmen Button
 		self.confirm_button.setVisible(False)  # deaktiviert den confirm_button
@@ -220,15 +220,11 @@ class GUIApp(QWidget):
 	def update_frame(self, frame):
 		"""Aktualisiert das Bild in der GUI mit einem neuen Frame."""
 		if frame is not None:
-			# Bild auf die Größe des QLabel-Widgets skalieren (keine Farbänderung!)
-			frame_resized = cv2.resize(frame, (self.label.width(), self.label.height()), interpolation=cv2.INTER_AREA)
-
+			frame_resized = cv2.resize(frame, (self.label.width(), self.label.height()), interpolation=cv2.INTER_AREA) # Bild auf die Größe des QLabel-Widgets skalieren
 			height, width, channel = frame_resized.shape  # Bilddimensionen bestimmen
 			bytes_per_line = 3 * width  # Byte-Anzahl pro Zeile berechnen (RGB = 3 Kanäle)
-
 			q_img = QImage(frame_resized.data, width, height, bytes_per_line, QImage.Format.Format_RGB888)  # QImage aus den Bilddaten erstellen
 			pixmap = QPixmap.fromImage(q_img)  # QPixmap für PyQt erzeugen
-
 			self.label.setPixmap(pixmap)  # Das Bild im GUI-Label aktualisieren
 
 	def closeEvent(self, event=None):
