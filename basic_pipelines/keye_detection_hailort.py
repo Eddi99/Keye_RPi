@@ -7,7 +7,7 @@ import numpy as np  # Falls noch nicht importiert
 
 class ObjectDetection:
 	def __init__(self):
-		yself.cap = cv2.VideoCapture(0)  # Öffnet die Kamera mit Index 0, falls kamera  nicht erkannt ggf. ändern
+		self.cap = cv2.VideoCapture(0)  # Öffnet die Kamera mit Index 0, falls kamera  nicht erkannt ggf. ändern
 		self.cap.set(3, 1280)  # Setzt die Breite des Kamera-Frames auf 1280 Pixel
 		self.cap.set(4, 720)  # Setzt die Höhe des Kamera-Frames auf 720 Pixel
 		self.frame_callback = None  # Callback-Funktion für die GUI-Einbettung des Personenerkennungsbildes

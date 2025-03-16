@@ -1,10 +1,8 @@
-import os
 import cv2  # OpenCV für Bildverarbeitung
 import threading  # Für paralleles Ausführen der Objekterkennung
 from PyQt5.QtWidgets import QApplication, QLabel, QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QDialog  # PyQt6 für GUI-Elemente
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen  # PyQt6 für Bildverarbeitung und Zeichnen
 from PyQt5.QtCore import Qt  # PyQt6 für Fenstersteuerung und Punktkoordinaten
-
 
 class GUIApp(QWidget):
 	def __init__(self, logic):
@@ -19,31 +17,36 @@ class GUIApp(QWidget):
 		self.image = None  # Variable zum Speichern des aktuellen Kamerabilds
 		self.current_roi = 1  # Speichert, welche ROI aktuell gesetzt wird
 		self.label = None  # GUI-Element zur Anzeige des Kamerabilds
+		self.banner_label = None # Banner, zur Anzeige von Nutzer-Infos
 		self.retake_picture_button= None # Button zumwiederholen des Fotos
 		self.confirm_button = None  # Button zum Bestätigen der ROIs
 		self.roi_reset_button = None  # Button zum Zurücksetzen der ROIs
 		self.relais_on_button = None  # Button zum Einschalten des Relais
 		self.relais_off_button = None  # Button zum Ausschalten des Relais
+		self.exit_button = None # Button zum Beenden des Programm 
 		self.confirm_button_bool = True  # Überprüfungsvariable zum nur einmaligen Abschicken der ROI
 
 		self.initUI()  # Initialisiert die Benutzeroberfläche
 
 	def initUI(self):
 		"""Initialisiert die UI mit Button-Anordnung und Bildgröße"""
-		self.setWindowTitle("Keye UI")  
+		self.setWindowTitle("Keye UI") # Fenstertitel setzen
 
 		screen_size = QApplication.primaryScreen().size() # Bildschirmgröße abrufen
-		screen_width = screen_size.width()
-		screen_height = screen_size.height()
+		screen_width = screen_size.width() # Bildschirmbreite speichern
+		screen_height = screen_size.height() # Bildschirmhöhe speichern
 
-		self.setGeometry(0, 0, int(screen_width * 0.9), int(screen_height * 0.9)) # Fenstergröße anpassen
-		self.image_width = int(screen_width * 0.85)
-		self.image_height = int(screen_height * 0.85)  
-
+		self.setGeometry(0, 0, int(screen_width * 0.9), int(screen_height * 0.9)) # Fenstergröße auf 90% des Bildschirms anpassen
+		self.image_width = int(screen_width * 0.85) # Breite des Bildes ist 85% der Fensterbreite
+		self.image_height = int(screen_height * 0.85) # Höhe des Bildes ist 85% der Fensterhöhe
 		
-		self.label = QLabel(self) # Bildanzeige-Label
-		self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-		self.label.setFixedSize(self.image_width, self.image_height)  
+		self.banner_label = QLabel("Willkommen! Bitte spannen Sie zwei Sicherheitszonen auf, indem Sie jeweils zwei Eckpunkte anklicken oder nehmen Sie das Bild erneut auf.",self)  # Info-Banner initialisieren
+		self.banner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+		self.banner_label.setStyleSheet("font-size: 16px; font-weight: bold; color: black;")
+		
+		self.label = QLabel(self) # Bildanzeige-Fenster (Label) im Layout
+		self.label.setAlignment(Qt.AlignmentFlag.AlignCenter) # Fenster mittig im Layout platzieren
+		self.label.setFixedSize(self.image_width, self.image_height) # Fenstergröße setzen
 
 		button_height = int(screen_height * 0.1) # Button-Höhe berechnen (10% der Bildschirmhöhe)
 
@@ -91,6 +94,7 @@ class GUIApp(QWidget):
 
 		layout = QVBoxLayout() # Hauptlayout vertikal angeordent
 		layout.addStretch()  # Platz vor dem Bild für Zentrierung
+		layout.addWidget(self.banner_label) # Infobanner ins Layout einfügen
 		layout.addWidget(self.label, alignment=Qt.AlignmentFlag.AlignCenter) # Bild ins Layout einfügen
 		layout.addStretch()  # Platz nach dem Bild
 		layout.addLayout(button_layout) # Button-Anordnung zur Hauptanordnung hinzufügen
@@ -150,18 +154,35 @@ class GUIApp(QWidget):
 	def mousePressEvent(self, event):
 		"""Erfasst die Mausposition, speichert die ROI-Punkte und zeigt ein temporäres Rechteck an."""
 		if len(self.roi_points) < 4: # Solange noch nicht die beiden ROIs festgelegt sind können weitere Punkte festgelegt werden
-			x = int(event.pos().x() - self.label.geometry().x()) # Korrigiert die Mausposition relativ zum Bild
-			y = int(event.pos().y() - self.label.geometry().y())
-			x = max(0, min(x, self.label.width() - 1))
-			y = max(0, min(y, self.label.height() - 1))
-			self.roi_points.append((x, y))
-			self.temp_roi = (x, y, x, y)  # Speichert die ROI temporär
+			x = int(event.pos().x() - self.label.geometry().x())  # Ermittelt die x-Koordinate der Maus relativ zum Bild, indem der Abstand zum linken Rand des QLabel-Widgets subtrahiert wird
+			y = int(event.pos().y() - self.label.geometry().y())  # Ermittelt die y-Koordinate der Maus relativ zum Bild, indem der Abstand zum oberen Rand des QLabel-Widgets subtrahiert wird
+			x = max(0, min(x, self.label.width() - 1))  # Stellt sicher, dass x innerhalb der Bildgrenzen bleibt (0 bis Bildbreite - 1), um Fehler durch negative oder zu große Werte zu vermeiden
+			y = max(0, min(y, self.label.height() - 1))  # Stellt sicher, dass y innerhalb der Bildgrenzen bleibt (0 bis Bildhöhe - 1)
+
+			self.roi_points.append((x, y))  # Speichert den angepassten Mauspunkt als ROI-Koordinate in der Liste der ROI-Punkte
+			self.temp_roi = (x, y, x, y)  # Initialisiert ein temporäres ROI-Rechteck mit einer Start- und Endposition, die zunächst identisch sind (dies wird später erweitert, wenn der zweite Punkt gesetzt wird)
+
+			if len(self.roi_points) % 2 == 0: # Wenn zwei Punkte für ein Rechteck vorhanden sind, werden sie automatisiert den richtigen ROI-punkten zugeordnet, egal in welcher Reihenfolge sie gesetzt wurden
+				x1, y1 = self.roi_points[-2]  # Erster gesetzter Punkt
+				x2, y2 = self.roi_points[-1]  # Zweiter gesetzter Punkt
+
+				# Berechnet den oberen linken und unteren rechten Punkt unabhängig von der Eingabereihenfolge
+				x_tl = min(x1, x2)  # Oberste linke X-Koordinate
+				y_tl = min(y1, y2)  # Oberste linke Y-Koordinate
+				x_br = max(x1, x2)  # Unterste rechte X-Koordinate
+				y_br = max(y1, y2)  # Unterste rechte Y-Koordinate
+
+				self.roi_points[-2] = (x_tl, y_tl) # Ersetzt die letzten beiden ROI-Punkte durch die sortierten Werte
+				self.roi_points[-1] = (x_br, y_br)
+				
 			print(f"mousePressEvent: ROI {self.current_roi}: Punkt {len(self.roi_points) % 2 + 1} gesetzt: {x}, {y}")
 			self.show_frame()  # zeigt das Bild aktualisiert mit den aktuellen ROIs an, falls es welche gibt
 			if len(self.roi_points) >= 4 and self.confirm_button_bool:
+				self.banner_label.setText("Sicherheitszonen gesetzt! Sie können das Programm starten oder die Zonen zurücksetzen.") # Nutzerinfo aktualisieren
 				self.confirm_button.setVisible(True)  # aktiviert den confirm_button, falls die ROI gesetzt wurden
 				self.retake_picture_button.setVisible(False)  # Blendet den Bild-wiederholen-Button aus
 			else:
+				self.banner_label.setText("Bitte spannen Sie zwei Sicherheitszonen auf, indem Sie jeweils zwei Eckpunkte anklicken oder nehmen Sie das Bild erneut auf.") # Nutzerinfo aktualisieren
 				self.retake_picture_button.setVisible(True)  # Blendet den Bild-wiederholen-Button ein
 				self.confirm_button.setVisible(False)  # deaktiviert den confirm_button, falls die ROI resettet wurden
 
@@ -179,6 +200,8 @@ class GUIApp(QWidget):
 		self.retake_picture_button.setVisible(False)  # Blendet den Bild-wiederholen-Button aus
 		self.relais_on_button.setVisible(True)  # Zeigt den Relais-EIN-Button an
 		self.relais_off_button.setVisible(True)  # Zeigt den Relais-AUS-Button an
+		
+		self.banner_label.setText("Durch Relais EIN und Relais AUS können Sie das Relais manuell steuern, zum Beenden Fenster schließen oder Beenden Klicken.")  # Nutzerinfo aktualisieren
 
 		self.logic.set_rois(roi1, roi2)  # ROI werte an die decision_logic übergeben
 
@@ -187,6 +210,8 @@ class GUIApp(QWidget):
 		detection_thread.start()
 
 	def roi_reset(self):
+		elf.banner_label.setText("Bitte spannen Sie zwei Sicherheitszonen auf, indem Sie jeweils zwei Eckpunkte anklicken oder nehmen Sie das Bild erneut auf.")  # Nutzerinfo aktualisieren
+		self.roi_points.clear()  # leert die Liste der gesetzten ROI-punkte
 		self.roi_points.clear()  # leert die Liste der gesetzten ROI-punkte
 		self.show_frame()  # zeigt das Bild aktualisiert ohne ROIs
 		self.retake_picture_button.setVisible(True) # aktiviert den Bild noch einmal aufnehmen Button
