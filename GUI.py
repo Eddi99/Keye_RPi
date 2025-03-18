@@ -37,8 +37,8 @@ class GUIApp(QWidget):
 		screen_height = screen_size.height() # Bildschirmhöhe speichern
 
 		self.setGeometry(0, 0, int(screen_width * 0.9), int(screen_height * 0.9)) # Fenstergröße auf 90% des Bildschirms anpassen
-		self.image_width = int(screen_width * 0.85) # Breite des Bildes ist 85% der Fensterbreite
-		self.image_height = int(screen_height * 0.85) # Höhe des Bildes ist 85% der Fensterhöhe
+		self.image_width = int(screen_width * 0.83) # Breite des Bildes ist 85% der Fensterbreite
+		self.image_height = int(screen_height * 0.83) # Höhe des Bildes ist 85% der Fensterhöhe
 		
 		self.banner_label = QLabel("Willkommen! Bitte spannen Sie zwei Sicherheitszonen auf, indem Sie jeweils zwei Eckpunkte anklicken oder nehmen Sie das Bild erneut auf.",self)  # Info-Banner initialisieren
 		self.banner_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
