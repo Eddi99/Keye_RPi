@@ -7,7 +7,7 @@ from ultralytics import YOLO  # YOLO für Objekterkennung
 
 
 class ObjectDetection:
-	def __init__(self, model_path="yolo11s_ncnn_model"):
+	def __init__(self, model_path="/home/EdgarCoy/Keye_RPi/yolo11s_ncnn_model"):
 		self.cap = cv2.VideoCapture(0)  # Öffnet die Kamera mit Index 0, falls kamera  nicht erkannt ggf. ändern
 		self.model_path = model_path # speichert den Pfad zum Yolo-Modell, dass an die Klasse übergeben wird
 		self.model = None # PLatzhalter für das Yolo-Modell
