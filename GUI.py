@@ -56,7 +56,7 @@ class GUIApp(QWidget):
 		self.retake_picture_button.setStyleSheet("background-color: gray; color: white; font-weight: bold; border: none;") # Buttonoptik festlegen
 		self.retake_picture_button.clicked.connect(self.capture_frame)  # Zuweisen der Buttonfunktion: Bild erneut aufnehmen
 
-		self.roi_reset_button = QPushButton("ROI Reset", self)
+		self.roi_reset_button = QPushButton("Zonen-Reset", self)
 		self.roi_reset_button.setFixedHeight(button_height)
 		self.roi_reset_button.setStyleSheet("background-color: gray; color: white; font-weight: bold; border: none;")
 		self.roi_reset_button.clicked.connect(self.roi_reset)  # Zuweisen der Buttonfunktion: ROI zurücksetzen

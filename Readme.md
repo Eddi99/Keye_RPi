@@ -9,7 +9,7 @@ Keye- ein YOLO-basiertes Sicherheitssystem welches mit Hilfe von Echtzeit Bildau
 - Für dauerhafte Nutzung SSD statt SD Karte empfohlen
 
 ### Setup
-Zum Installieren einfach Ordner entpacken, .exe ausführen
+Zum Installieren einfach Ordner entpacken, Keye.sh ausführen
 ### Fehlerbehebung
 Bei Neuinstallation ggf. 
 
