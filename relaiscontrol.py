@@ -7,6 +7,8 @@ class RelaisControl:
         self.device = None  # Initialisiert die Gerät-Variable als None
         self.connect()  # Stellt die Verbindung zum Relais her
 
+        self.relais_bool = False  # gibt der GUI auskunft über den derzeitigen Schaltstatus des Relais
+
     def connect(self):
         """ Öffnet das HIDRAW-Gerät zum Schreiben. """
         try:
@@ -40,6 +42,7 @@ class RelaisControl:
     def on_all(self):
         """ Schaltet alle Relais ein. """
         if self.write_data([0x00, 0xFE, 0, 0, 0, 0, 0, 0, 1]):  # Sendet das Einschaltkommando
+            self.relais_bool = True  # GUI kann ablesen, dass das Relais eingeschaltet ist
             print("Relais wurde eingeschaltet")  # Bestätigungsausgabe
             return True  # Gibt True zurück, falls erfolgreich
         else:
@@ -49,6 +52,7 @@ class RelaisControl:
     def off_all(self):
         """ Schaltet alle Relais aus. """
         if self.write_data([0x00, 0xFC, 0, 0, 0, 0, 0, 0, 1]):  # Sendet das Ausschaltkommando
+            self.relais_bool = False  # GUI kann ablesen, dass das Relais ausgeschaltet ist
             print("Relais wurde ausgeschaltet")  # Bestätigungsausgabe
             return True  # Gibt True zurück, falls erfolgreich
         else:

@@ -1,8 +1,9 @@
 import cv2  # OpenCV für Bildverarbeitung
 import threading  # Für paralleles Ausführen der Objekterkennung
-from PyQt5.QtWidgets import QApplication, QLabel, QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QDialog  # PyQt6 für GUI-Elemente
+from PyQt5.QtWidgets import QApplication, QLabel, QPushButton, QVBoxLayout, QWidget, QHBoxLayout, QDialog, \
+	QComboBox, QListView  # PyQt6 für GUI-Elemente
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QPen  # PyQt6 für Bildverarbeitung und Zeichnen
-from PyQt5.QtCore import Qt  # PyQt6 für Fenstersteuerung und Punktkoordinaten
+from PyQt5.QtCore import Qt, QTimer  # PyQt6 für Fenstersteuerung und Punktkoordinaten
 
 class GUIApp(QWidget):
 	def __init__(self, logic):
@@ -18,15 +19,21 @@ class GUIApp(QWidget):
 		self.current_roi = 1  # Speichert, welche ROI aktuell gesetzt wird
 		self.label = None  # GUI-Element zur Anzeige des Kamerabilds
 		self.banner_label = None # Banner, zur Anzeige von Nutzer-Infos
+		self.camera_selector = None  # Dropdown für Kameraauswahl
 		self.retake_picture_button= None # Button zumwiederholen des Fotos
 		self.confirm_button = None  # Button zum Bestätigen der ROIs
 		self.roi_reset_button = None  # Button zum Zurücksetzen der ROIs
 		self.relais_on_button = None  # Button zum Einschalten des Relais
 		self.relais_off_button = None  # Button zum Ausschalten des Relais
 		self.exit_button = None # Button zum Beenden des Programm 
-		self.confirm_button_bool = True  # Überprüfungsvariable zum nur einmaligen Abschicken der ROI
+		self.start_detection_bool = True  # Überprüfungsvariable zum nur einmaligen Abschicken der ROI
+		self.last_relais_state = self.logic.relais.relais_bool  # Speichert den letzten bekannten Status des Relais
 
 		self.initUI()  # Initialisiert die Benutzeroberfläche
+
+		self.relais_timer = QTimer(self)  # Überwacht den Relaisstatus regelmäßig alle 200ms
+		self.relais_timer.timeout.connect(self.check_relais_state)
+		self.relais_timer.start(200)  # 200 Millisekunden
 
 	def initUI(self):
 		"""Initialisiert die UI mit Button-Anordnung und Bildgröße"""
@@ -50,6 +57,43 @@ class GUIApp(QWidget):
 
 		button_height = int(screen_height * 0.1) # Button-Höhe berechnen (10% der Bildschirmhöhe)
 
+		# Dropdown zur Auswahl der Kameraquelle
+		self.camera_selector = QComboBox(self)
+		self.camera_selector.setFixedWidth(int(screen_width * 0.1))
+		self.camera_selector.setView(QListView())
+		self.camera_selector.addItems(["Kamera 0", "Kamera 1", "Kamera 2"])
+		self.camera_selector.setFixedHeight(button_height)
+		# Stylesheet für das Aussehen des Dropdown-Menüs
+		self.camera_selector.setStyleSheet("""
+					QComboBox {
+						background-color: gray;
+						color: white;
+						font-weight: bold;
+						border: none;
+						text-align: center;
+					}
+				""")
+		view = QListView()
+		view.setStyleSheet("""
+				    QListView::item {
+				        min-height: 70px;  /* Höhe jeder Auswahlzeile */
+				        font-size: 24px;   /* größere Schrift für Touch */
+				        padding-left: 10px;  /* etwas Abstand vom Rand */
+				    }
+
+				    QListView {
+				        background-color: gray;
+				        color: white;
+				        outline: none;
+				    }
+
+				    QListView::item:selected {
+				        background-color: darkgray;
+				    }
+				""")
+		self.camera_selector.setView(view)
+		self.camera_selector.activated.connect(self.set_camera_index)  # Direkt ausführen beim Klick
+
 		# Buttons erstellen
 		self.retake_picture_button = QPushButton("Bild erneut aufnehmen", self) # Buttontext festlegen
 		self.retake_picture_button.setFixedHeight(button_height) # Buttonhöhe festsetzen
@@ -63,17 +107,17 @@ class GUIApp(QWidget):
 
 		self.confirm_button = QPushButton("Bestätigen und Starten", self)
 		self.confirm_button.setFixedHeight(button_height)
-		self.confirm_button.setStyleSheet("background-color: gray; color: white; font-weight: bold; border: none;")
+		self.confirm_button.setStyleSheet("background-color: red; color: white; font-weight: bold; border: none;")
 		self.confirm_button.setVisible(False)  # Anfangs unsichtbar
 		self.confirm_button.clicked.connect(self.confirm_rois)  # Zuweisen der Buttonfunktion: ROIs bestätigen und starten
 
-		self.relais_on_button = QPushButton("Relais EIN", self)
+		self.relais_on_button = QPushButton("Einschalten", self)
 		self.relais_on_button.setFixedHeight(button_height)
 		self.relais_on_button.setStyleSheet("background-color: green; color: white; font-weight: bold; border: none;")
 		self.relais_on_button.setVisible(False)  # Anfangs unsichtbar
 		self.relais_on_button.clicked.connect(self.logic.relais.on_all)  # Zuweisen der Buttonfunktion: Relais einschalten
 
-		self.relais_off_button = QPushButton("Relais AUS", self)
+		self.relais_off_button = QPushButton("Ausschalten", self)
 		self.relais_off_button.setFixedHeight(button_height)
 		self.relais_off_button.setStyleSheet("background-color: red; color: white; font-weight: bold; border: none;")
 		self.relais_off_button.setVisible(False)  # Anfangs unsichtbar
@@ -81,11 +125,13 @@ class GUIApp(QWidget):
 
 		self.exit_button = QPushButton("Beenden", self)
 		self.exit_button.setFixedHeight(button_height)
+		self.exit_button.setFixedWidth(int(screen_width * 0.1))
 		self.exit_button.setStyleSheet("background-color: gray; color: white; font-weight: bold; border: none;")
 		self.exit_button.clicked.connect(self.closeEvent)  # Zuweisen der Buttonfunktion: Programm sicher beenden
 
 		button_layout = QHBoxLayout() # Button-Anordnung horizontal
-		button_layout.addWidget(self.retake_picture_button) # Hinzufügen der Buttons zum Button-Layout
+		button_layout.addWidget(self.camera_selector) # Hinzufügen der Buttons zum Button-Layout
+		button_layout.addWidget(self.retake_picture_button)
 		button_layout.addWidget(self.confirm_button)
 		button_layout.addWidget(self.roi_reset_button)
 		button_layout.addWidget(self.relais_on_button)
@@ -102,11 +148,46 @@ class GUIApp(QWidget):
 		self.setLayout(layout) # Anwenden des Layouts
 		self.capture_frame() # aufrufen der capture_frame, nimmt das Bild zur Festlegung der ROIs auf
 
+	def set_camera_index(self):
+		"""Ändert den Kameraindex zur Laufzeit"""
+		try:
+			self.logic.detector.cap.release()  # Aktuelle Kamera schließen
+			self.logic.detector.cap = cv2.VideoCapture(self.camera_selector.currentIndex(), cv2.CAP_DSHOW)  # Neue Kamera öffnen
+			self.logic.detector.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # MJPEG-Format erzwingen
+			self.logic.detector.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+			self.logic.detector.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+			self.logic.detector.cap.set(cv2.CAP_PROP_FPS, 30)  # Versucht, die FPS auf 30 zu setzen
+			print(f"Kameraindex erfolgreich auf {self.camera_selector.currentIndex()} gesetzt.")
+			self.capture_frame()  # direkt neues Bild laden
+
+		except Exception as e:
+			print(f"Fehler beim Setzen des Kameraindex: {e}")
+
+	def check_relais_state(self):
+		"""Überwacht den Schaltzustand des Relais und reagiert auf Änderungen"""
+		current_state = self.logic.relais.relais_bool
+		if current_state != self.last_relais_state:
+			self.last_relais_state = current_state
+			self.on_relais_state_changed(current_state)
+
+	def on_relais_state_changed(self, state):
+		"""Führe hier deine gewünschte Reaktion auf den Zustandswechsel aus"""
+		if not self.start_detection_bool:  # Verhindert das Verändern der Buttons, solange das Programm noch nicht läuft
+			if state:  # Wenn das Relais eingeschaltet ist, ausschaltbutton aktiv setzen und einschaltbutton inaktiv
+				self.relais_on_button.setVisible(False)
+				self.relais_off_button.setVisible(True)
+
+			else:  # Wenn das Relais ausgeschaltet ist, einschaltbutton aktiv setzen und ausschaltbutton inaktiv
+				self.relais_on_button.setVisible(True)
+				self.relais_off_button.setVisible(False)
+
 	def capture_frame(self):
 		"""Nimmt Einzelbild zum Setzen der ROIs auf"""
 		cap = self.logic.detector.cap  # Nutze das bereits geöffnete Kamera-Objekt aus keye_detection.py
 		cap.set(3, 1280)  # Setzt die Breite des Kamera-Frames auf 1280 Pixel
 		cap.set(4, 720)  # Setzt die Höhe des Kamera-Frames auf 720 Pixel
+		for _ in range(3):  # Kamera warmlaufen lassen, sonst blackscreen
+			cap.read()
 		ret, frame = cap.read()  # Nimmt ein Einzelbild auf
 
 		if ret:
@@ -116,6 +197,8 @@ class GUIApp(QWidget):
 			self.show_frame()  # Zeigt das Bild im GUI-Fenster an
 
 		else:
+			self.camera_selector.setCurrentIndex(0)  # setzt automatisch "Kamera 0" wenn gewählte kamera nicht verfügbar
+			self.set_camera_index()
 			print("Kamerabild konnte nicht geladen werden")  # Fehlerausgabe, falls kein Bild aufgenommen werden konnte
 
 	def show_frame(self):
@@ -177,14 +260,16 @@ class GUIApp(QWidget):
 				
 			print(f"mousePressEvent: ROI {self.current_roi}: Punkt {len(self.roi_points) % 2 + 1} gesetzt: {x}, {y}")
 			self.show_frame()  # zeigt das Bild aktualisiert mit den aktuellen ROIs an, falls es welche gibt
-			if len(self.roi_points) >= 4 and self.confirm_button_bool:
+			if len(self.roi_points) >= 4 and self.start_detection_bool:
 				self.banner_label.setText("Sicherheitszonen gesetzt! Sie können das Programm starten oder die Zonen zurücksetzen.") # Nutzerinfo aktualisieren
 				self.confirm_button.setVisible(True)  # aktiviert den confirm_button, falls die ROI gesetzt wurden
 				self.retake_picture_button.setVisible(False)  # Blendet den Bild-wiederholen-Button aus
+				self.camera_selector.setVisible(False)
 			else:
 				self.banner_label.setText("Bitte spannen Sie zwei Sicherheitszonen auf, indem Sie jeweils zwei Eckpunkte anklicken oder nehmen Sie das Bild erneut auf.") # Nutzerinfo aktualisieren
 				self.retake_picture_button.setVisible(True)  # Blendet den Bild-wiederholen-Button ein
 				self.confirm_button.setVisible(False)  # deaktiviert den confirm_button, falls die ROI resettet wurden
+				self.camera_selector.setVisible(True)
 
 	def confirm_rois(self):
 		"""Bestätigt die gesetzten ROIs und übergibt sie an die Entscheidungslogik."""
@@ -195,9 +280,10 @@ class GUIApp(QWidget):
 
 		# Ändert die Buttons von den ROI reset und Start zu Relais ein und aus
 		self.confirm_button.setVisible(False)  # Blendet den Start-Button aus
-		self.confirm_button_bool = False  # deaktiviert den confirm_button dauerhaft
+		self.start_detection_bool = False  # deaktiviert den confirm_button dauerhaft
 		self.roi_reset_button.setVisible(False)  # Blendet den ROI-Reset-Button aus
 		self.retake_picture_button.setVisible(False)  # Blendet den Bild-wiederholen-Button aus
+		self.camera_selector.setVisible(False)  # Blendet das Dropdown aus
 		self.relais_on_button.setVisible(True)  # Zeigt den Relais-EIN-Button an
 		self.relais_off_button.setVisible(True)  # Zeigt den Relais-AUS-Button an
 		
@@ -215,6 +301,7 @@ class GUIApp(QWidget):
 		self.roi_points.clear()  # leert die Liste der gesetzten ROI-Punkte
 		self.show_frame()  # zeigt das Bild aktualisiert ohne ROIs
 		self.retake_picture_button.setVisible(True) # aktiviert den Bild noch einmal aufnehmen Button
+		self.camera_selector.setVisible(True)  # aktiviert das Kamera-auswählen-Dropdown
 		self.confirm_button.setVisible(False)  # deaktiviert den confirm_button
 
 	def update_frame(self, frame):
