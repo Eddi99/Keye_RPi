@@ -28,6 +28,7 @@ class GUIApp(QWidget):
 		self.exit_button = None # Button zum Beenden des Programm 
 		self.start_detection_bool = True  # Überprüfungsvariable zum nur einmaligen Abschicken der ROI
 		self.last_relais_state = self.logic.relais.relais_bool  # Speichert den letzten bekannten Status des Relais
+		self.set_index_once = True # Variable verhindert, dass bei keiner angeschlossenen Kamera Endlosschleife entsteht
 
 		self.initUI()  # Initialisiert die Benutzeroberfläche
 
@@ -75,21 +76,21 @@ class GUIApp(QWidget):
 				""")
 		view = QListView()
 		view.setStyleSheet("""
-				    QListView::item {
-				        min-height: 70px;  /* Höhe jeder Auswahlzeile */
-				        font-size: 24px;   /* größere Schrift für Touch */
-				        padding-left: 10px;  /* etwas Abstand vom Rand */
-				    }
+					QListView::item {
+						min-height: 70px;  /* Höhe jeder Auswahlzeile */
+						font-size: 24px;   /* größere Schrift für Touch */
+						padding-left: 10px;  /* etwas Abstand vom Rand */
+					}
 
-				    QListView {
-				        background-color: gray;
-				        color: white;
-				        outline: none;
-				    }
+					QListView {
+						background-color: gray;
+						color: white;
+						outline: none;
+					}
 
-				    QListView::item:selected {
-				        background-color: darkgray;
-				    }
+					QListView::item:selected {
+						background-color: darkgray;
+					}
 				""")
 		self.camera_selector.setView(view)
 		self.camera_selector.activated.connect(self.set_camera_index)  # Direkt ausführen beim Klick
@@ -152,11 +153,9 @@ class GUIApp(QWidget):
 		"""Ändert den Kameraindex zur Laufzeit"""
 		try:
 			self.logic.detector.cap.release()  # Aktuelle Kamera schließen
-			self.logic.detector.cap = cv2.VideoCapture(self.camera_selector.currentIndex(), cv2.CAP_DSHOW)  # Neue Kamera öffnen
-			self.logic.detector.cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))  # MJPEG-Format erzwingen
+			self.logic.detector.cap = cv2.VideoCapture(self.camera_selector.currentIndex())  # Neue Kamera öffnen
 			self.logic.detector.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 			self.logic.detector.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-			self.logic.detector.cap.set(cv2.CAP_PROP_FPS, 30)  # Versucht, die FPS auf 30 zu setzen
 			print(f"Kameraindex erfolgreich auf {self.camera_selector.currentIndex()} gesetzt.")
 			self.capture_frame()  # direkt neues Bild laden
 
@@ -195,11 +194,15 @@ class GUIApp(QWidget):
 			frame = cv2.flip(frame, 1)  # Spiegelt das Bild horizontal
 			self.image = cv2.resize(frame, (self.image_width, self.image_height))  # Skaliert das Bild auf die Fenstergröße
 			self.show_frame()  # Zeigt das Bild im GUI-Fenster an
+			self.set_index_once = True
 
 		else:
-			self.camera_selector.setCurrentIndex(0)  # setzt automatisch "Kamera 0" wenn gewählte kamera nicht verfügbar
-			self.set_camera_index()
-			print("Kamerabild konnte nicht geladen werden")  # Fehlerausgabe, falls kein Bild aufgenommen werden konnte
+			if self.set_index_once:
+				self.set_index_once = False
+				self.camera_selector.setCurrentIndex(0)  # setzt automatisch "Kamera 0" wenn gewählte kamera nicht verfügbar
+				self.set_camera_index()
+				print("Kamerabild konnte nicht geladen werden")  # Fehlerausgabe, falls kein Bild aufgenommen werden konnte
+				
 
 	def show_frame(self):
 		"""Zeigt das Bild aus capture_frame zum Setzen der ROIs in der UI an"""
@@ -361,4 +364,3 @@ class GUIApp(QWidget):
 			os.system("sudo shutdown -h now")
 			self.close()
 			
-
